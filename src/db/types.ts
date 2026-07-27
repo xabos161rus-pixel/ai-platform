@@ -34,6 +34,17 @@ export interface Message extends BaseEntity {
   costRub: number | null;
   status: MessageStatus;
   error: string | null;
+  /**
+   * Общий идентификатор «прогона» для режима сравнения: один вопрос уходит в
+   * несколько моделей, и их ответы — сиблинги с одним runId. Рисуются рядом
+   * колонками, а в контекст следующего вопроса уходит только выбранный.
+   * null/undefined — обычный одиночный ответ.
+   */
+  runId?: string | null;
+  /** Порядок колонки внутри прогона. */
+  runIndex?: number;
+  /** Победитель прогона — его ответ уходит в контекст. */
+  chosen?: boolean;
 }
 
 /**
@@ -56,6 +67,8 @@ export interface Settings {
   theme: 'dark' | 'light' | 'system';
   activeProviderId: string | null;
   defaultModel: string;
+  /** Модели для режима сравнения: `providerId:model`. Пусто — режим выключен. */
+  compareModels?: string[];
   // Сколько последних сообщений уходит в модель. Прямой контроль расхода:
   // длинный диалог иначе оплачивается целиком на каждом вопросе.
   historyLimit: number;

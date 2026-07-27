@@ -79,6 +79,36 @@ await p.getByPlaceholder('Поиск').fill('');
 // Переключатель модели в шапке
 check(await p.getByRole('button', { expanded: false }).first().isVisible(), 'переключатель модели в шапке');
 
+// Командная палитра
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(600);
+await p.keyboard.press('Control+k');
+await p.waitForTimeout(500);
+check(await p.getByPlaceholder('Команда, чат или модель…').isVisible(), 'палитра открылась по ⌘K');
+await p.getByPlaceholder('Команда, чат или модель…').fill('сравн');
+await p.waitForTimeout(300);
+check((await p.textContent('[role=dialog]')).includes('сравнения'), 'палитра ищет команды');
+await p.keyboard.press('Escape');
+await p.waitForTimeout(300);
+check(!(await p.locator('[role=dialog]').count()), 'палитра закрылась по Escape');
+
+// Режим сравнения: нужно минимум две модели, поэтому заводим провайдера
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Добавить провайдера' }).click();
+await p.waitForTimeout(400);
+await p.getByPlaceholder('Polza.ai', { exact: true }).fill('Тест');
+await p.getByPlaceholder('https://api.polza.ai/api/v1').fill('https://example.invalid/v1');
+await p.getByPlaceholder('claude-sonnet-5, gpt-5.6').fill('model-a, model-b');
+await p.getByRole('button', { name: 'Сохранить' }).click();
+await p.waitForTimeout(600);
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(600);
+check(await p.getByRole('button', { name: 'сравнить' }).isVisible(), 'кнопка сравнения в композере');
+await p.getByRole('button', { name: 'сравнить' }).click();
+await p.waitForTimeout(500);
+check((await p.textContent('body')).includes('сравнить:'), 'панель выбора моделей раскрылась');
+
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
 

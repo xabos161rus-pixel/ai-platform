@@ -20,7 +20,8 @@ export interface ModelInfo {
 }
 
 export const MODELS: ModelInfo[] = [
-  { id: 'demo-echo', label: 'Демо (бесплатно)', priceIn: 0, priceOut: 0, note: 'Отвечает заглушка, без сети' },
+  { id: 'demo-echo', label: 'Демо · подробный', priceIn: 0, priceOut: 0, note: 'Заглушка, без сети' },
+  { id: 'demo-fast', label: 'Демо · краткий', priceIn: 0, priceOut: 0, note: 'Заглушка, короткие ответы' },
 ];
 
 export function modelById(id: string): ModelInfo | undefined {

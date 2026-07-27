@@ -75,7 +75,11 @@ export async function addUserMessage(chat: Chat, content: string): Promise<Messa
   });
 }
 
-export async function addAssistantMessage(chatId: string, reply: Reply): Promise<Message> {
+export async function addAssistantMessage(
+  chatId: string,
+  reply: Reply,
+  run?: { runId: string; runIndex: number; chosen?: boolean },
+): Promise<Message> {
   return addMessage({
     chatId,
     role: 'assistant',
@@ -86,10 +90,50 @@ export async function addAssistantMessage(chatId: string, reply: Reply): Promise
     costRub: costRub(reply.model, reply.usage.in, reply.usage.out),
     status: 'done',
     error: null,
+    runId: run?.runId ?? null,
+    runIndex: run?.runIndex ?? 0,
+    chosen: run?.chosen ?? false,
   });
 }
 
-export async function addErrorMessage(chatId: string, error: string): Promise<Message> {
+/**
+ * Выбрать победителя прогона сравнения: его ответ уходит в контекст, остальные
+ * колонки остаются в переписке как история, но модель их больше не видит.
+ */
+export async function chooseWinner(runId: string, messageId: string): Promise<void> {
+  const rows = await db.messages.where('chatId').equals((await db.messages.get(messageId))?.chatId ?? '').toArray();
+  const ts = now();
+  const updates = rows
+    .filter((m) => m.runId === runId)
+    .map((m) => ({ key: m.id, changes: { chosen: m.id === messageId, updatedAt: ts } }));
+  if (updates.length) await db.messages.bulkUpdate(updates);
+}
+
+/**
+ * Группировка ленты: подряд идущие ответы одного прогона сравнения
+ * сворачиваются в одну строку-группу, остальное остаётся как есть.
+ */
+export function groupRuns(messages: Message[]): (Message | Message[])[] {
+  const out: (Message | Message[])[] = [];
+  const seen = new Set<string>();
+  for (const m of messages) {
+    if (!m.runId) {
+      out.push(m);
+      continue;
+    }
+    if (seen.has(m.runId)) continue;
+    seen.add(m.runId);
+    const group = messages.filter((x) => x.runId === m.runId).sort((a, b) => (a.runIndex ?? 0) - (b.runIndex ?? 0));
+    out.push(group.length > 1 ? group : group[0]);
+  }
+  return out;
+}
+
+export async function addErrorMessage(
+  chatId: string,
+  error: string,
+  run?: { runId: string; runIndex: number },
+): Promise<Message> {
   return addMessage({
     chatId,
     role: 'assistant',
@@ -100,6 +144,9 @@ export async function addErrorMessage(chatId: string, error: string): Promise<Me
     costRub: null,
     status: 'error',
     error,
+    runId: run?.runId ?? null,
+    runIndex: run?.runIndex ?? 0,
+    chosen: false,
   });
 }
 
@@ -115,7 +162,20 @@ export async function removeMessage(id: string): Promise<void> {
  * оплачивается целиком на каждом вопросе.
  */
 export function toContext(messages: Message[], historyLimit: number): { role: 'user' | 'assistant'; content: string }[] {
-  const usable = messages.filter((m) => m.status === 'done' && m.content.trim());
+  // Из прогона сравнения в контекст уходит ТОЛЬКО один ответ — выбранный, а
+  // если выбор не сделан, первый. Иначе модель получила бы несколько разных
+  // ответов на один и тот же вопрос, а платить пришлось бы за все сразу.
+  const taken = new Set<string>();
+  const usable = messages.filter((m) => {
+    if (m.status !== 'done' || !m.content.trim()) return false;
+    if (!m.runId) return true;
+    if (taken.has(m.runId)) return false;
+    const group = messages.filter((x) => x.runId === m.runId);
+    const winner = group.find((x) => x.chosen) ?? group[0];
+    if (winner.id !== m.id) return false;
+    taken.add(m.runId);
+    return true;
+  });
   const tail = historyLimit > 0 ? usable.slice(-historyLimit) : usable;
   return tail.map((m) => ({ role: m.role, content: m.content }));
 }

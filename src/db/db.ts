@@ -57,7 +57,7 @@ export async function ensureSeed(): Promise<void> {
       name: 'Демо (без ключа)',
       baseUrl: '',
       apiKey: '',
-      models: ['demo-echo'],
+      models: ['demo-echo', 'demo-fast'],
       isDemo: true,
     });
   }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { ArrowUp, Copy, Download, PanelLeft, RotateCcw, Settings, Sparkles, Square } from 'lucide-react';
 import { db } from '../../db/db';
 import type { Message, Provider } from '../../db/types';
@@ -22,9 +22,15 @@ import {
 import { Markdown } from './Markdown';
 import { Sidebar } from './Sidebar';
 import { ModelPicker } from './ModelPicker';
+import { CompareGroup } from './CompareGroup';
+import { CompareBar } from './CompareBar';
+import { CommandPalette } from './CommandPalette';
+import { groupRuns } from '../../lib/ai/chatRepo';
+import { uid } from '../../lib/repo';
 
 export function ChatPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -33,6 +39,9 @@ export function ChatPage() {
   // запись каждого чанка в наблюдаемую таблицу перечитывала бы весь чат и
   // перерисовывала ленту десятки раз в секунду. В базу уходит один раз, в конце.
   const [streamText, setStreamText] = useState('');
+  // Потоки колонок сравнения: индекс колонки → накопленный текст.
+  const [compareStream, setCompareStream] = useState<Record<number, string>>({});
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -126,6 +135,54 @@ export function ChatPage() {
     [chat, settings, provider],
   );
 
+  /**
+   * Сравнение: один вопрос уходит в несколько моделей ОДНОВРЕМЕННО, ответы
+   * печатаются параллельно в своих колонках. Колонка, которая упала, не рушит
+   * остальные — каждая обрабатывается отдельно.
+   */
+  const askCompare = useCallback(
+    async (picks: { providerId: string; model: string }[]) => {
+      if (!chat || !settings) return;
+      setBusy(true);
+      setCompareStream({});
+      const ac = new AbortController();
+      abortRef.current = ac;
+      const runId = uid();
+      const history = toContext(await chatMessages(chat.id), settings.historyLimit);
+      try {
+        await Promise.all(
+          picks.map(async (pick, i) => {
+            const prov = providers.find((p) => p.id === pick.providerId) ?? null;
+            let partial = '';
+            try {
+              const reply = await streamChat({
+                provider: prov,
+                messages: history,
+                systemPrompt: chat.systemPrompt,
+                model: pick.model,
+                signal: ac.signal,
+                onDelta: (piece) => {
+                  partial += piece;
+                  setCompareStream((s) => ({ ...s, [i]: partial }));
+                },
+              });
+              // Первая колонка становится выбранной по умолчанию: контекст
+              // не должен оставаться пустым, если человек не нажал «выбрать».
+              await addAssistantMessage(chat.id, reply, { runId, runIndex: i, chosen: i === 0 });
+            } catch (e) {
+              await addErrorMessage(chat.id, errorText(e), { runId, runIndex: i });
+            }
+          }),
+        );
+      } finally {
+        abortRef.current = null;
+        setCompareStream({});
+        setBusy(false);
+      }
+    },
+    [chat, settings, providers],
+  );
+
   async function handleSend() {
     const text = draft.trim();
     if (!text || busy || !chat) return;
@@ -133,7 +190,8 @@ export function ChatPage() {
     if (inputRef.current) inputRef.current.style.height = 'auto';
     atBottom.current = true;
     await addUserMessage(chat, text);
-    await ask();
+    if (comparePicks.length > 1) await askCompare(comparePicks);
+    else await ask();
     inputRef.current?.focus();
   }
 
@@ -166,12 +224,15 @@ export function ChatPage() {
     URL.revokeObjectURL(url);
   }
 
-  // ⌘N — новый чат, ⌘/ — фокус в поле ввода. Без клавиатуры платформа на
-  // маке ощущается медленной, сколько бы кнопок ни было на экране.
+  // ⌘K — палитра, ⌘N — новый чат, ⌘/ — фокус в поле. Без клавиатуры
+  // платформа на маке ощущается медленной, сколько бы кнопок ни было видно.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
-      if (meta && e.key === 'n') {
+      if (meta && e.key === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      } else if (meta && e.key === 'n') {
         e.preventDefault();
         void handleNewChat();
       } else if (meta && e.key === '/') {
@@ -182,6 +243,17 @@ export function ChatPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  const comparePicks = (settings?.compareModels ?? [])
+    .map((k) => {
+      const [providerId, ...rest] = k.split(':');
+      return { providerId, model: rest.join(':') };
+    })
+    .filter((x) => providers.some((p) => p.id === x.providerId));
+
+  async function setComparePicks(keys: string[]) {
+    await db.settings.update('app', { compareModels: keys, updatedAt: new Date().toISOString() });
+  }
 
   return (
     <div className="fixed inset-0 flex bg-bg">
@@ -253,26 +325,40 @@ export function ChatPage() {
         >
           <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-5">
             {!messages.length && !streamText && <Welcome demo={provider?.isDemo ?? false} />}
-            {messages.map((m) =>
-              m.role === 'user' ? (
-                <UserBubble key={m.id} message={m} />
+            {groupRuns(messages).map((item) =>
+              Array.isArray(item) ? (
+                <CompareGroup key={item[0].id} group={item} onCopy={(t) => void copyText(t)} />
+              ) : item.role === 'user' ? (
+                <UserBubble key={item.id} message={item} />
               ) : (
                 <AssistantBlock
-                  key={m.id}
-                  message={m}
+                  key={item.id}
+                  message={item}
                   busy={busy}
-                  onCopy={() => void copyText(m.content)}
-                  onRetry={() => void ask(m.id)}
+                  onCopy={() => void copyText(item.content)}
+                  onRetry={() => void ask(item.id)}
                 />
               ),
             )}
-            {busy && <Streaming text={streamText} />}
+            {busy &&
+              (comparePicks.length > 1 ? (
+                <StreamingCompare picks={comparePicks} texts={compareStream} />
+              ) : (
+                <Streaming text={streamText} />
+              ))}
             <div ref={bottomRef} />
           </div>
         </div>
 
         <div className="shrink-0 border-t border-hairline bg-bg">
-          <div className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+10px)]">
+          <div className="mx-auto w-full max-w-3xl px-4 pt-2">
+            <CompareBar
+              providers={providers}
+              picks={settings?.compareModels ?? []}
+              onChange={(keys) => void setComparePicks(keys)}
+            />
+          </div>
+          <div className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+10px)]">
             <textarea
               ref={inputRef}
               value={draft}
@@ -315,6 +401,27 @@ export function ChatPage() {
           </div>
         </div>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        chats={list}
+        providers={providers}
+        onPickChat={setPickedId}
+        onNewChat={() => void handleNewChat()}
+        onPickModel={(providerId, model) => chat && void patchChat(chat.id, { providerId, model })}
+        onToggleTheme={() =>
+          void db.settings.update('app', {
+            theme: settings?.theme === 'light' ? 'dark' : 'light',
+            updatedAt: new Date().toISOString(),
+          })
+        }
+        onToggleCompare={() => {
+          const all = providers.flatMap((p) => p.models.map((m) => `${p.id}:${m}`));
+          void setComparePicks(settings?.compareModels?.length ? [] : all.slice(0, 2));
+        }}
+        onOpenSettings={() => navigate('/settings')}
+      />
     </div>
   );
 }
@@ -388,6 +495,48 @@ function AssistantBlock({
           >
             <RotateCcw size={13} />
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Колонки сравнения во время генерации: все потоки печатаются одновременно. */
+function StreamingCompare({
+  picks,
+  texts,
+}: {
+  picks: { providerId: string; model: string }[];
+  texts: Record<number, string>;
+}) {
+  return (
+    <div className="grid grid-cols-[var(--cc-marker-col)_1fr]">
+      <div aria-hidden className="pt-[0.55rem]">
+        <span className="block size-1.5 animate-pulse rounded-full bg-accent" />
+      </div>
+      <div className="min-w-0">
+        <p className="mb-2 font-mono text-[var(--cc-text-caption)] text-muted">сравнение · {picks.length}</p>
+        <div
+          className="space-y-2 lg:grid lg:gap-3 lg:space-y-0"
+          style={{ gridTemplateColumns: `repeat(${picks.length}, minmax(0, 1fr))` }}
+        >
+          {picks.map((pick, i) => (
+            <article key={`${pick.providerId}:${pick.model}`} className="rounded-[var(--cc-radius)] border border-hairline p-3">
+              <header className="mb-2 border-b border-hairline pb-2 font-mono text-[var(--cc-text-caption)] text-muted">
+                {modelLabel(pick.model)}
+              </header>
+              {texts[i] ? (
+                <>
+                  <Markdown text={texts[i]} />
+                  <span className="animate-caret -mt-1 inline-block text-accent">▍</span>
+                </>
+              ) : (
+                <p className="font-mono text-[var(--cc-text-caption)] text-muted">
+                  ждёт<span className="animate-caret">▍</span>
+                </p>
+              )}
+            </article>
+          ))}
         </div>
       </div>
     </div>

@@ -76,8 +76,18 @@ export function errorText(e: unknown): string {
 }
 
 /** Ответ демо-провайдера: платформа работает сразу после установки. */
-function demoReply(messages: ChatMessage[], systemPrompt: string): Reply {
+function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-echo'): Reply {
   const last = messages[messages.length - 1];
+  if (model === 'demo-fast') {
+    const short = [
+      '**Демо · краткий.** Вторая модель отвечает иначе — так видно смысл сравнения.',
+      '',
+      `Вопрос: «${last.content.slice(0, 120)}»`,
+      '',
+      `Сообщений в контексте: ${messages.length}`,
+    ].join('\n');
+    return { content: short, model, usage: { in: estimateTokens(last.content), out: estimateTokens(short) } };
+  }
   const content = [
     '**Демо-режим.** Провайдер не подключён — отвечает встроенная заглушка.',
     '',
@@ -100,7 +110,7 @@ function demoReply(messages: ChatMessage[], systemPrompt: string): Reply {
     '```',
   ].join('\n');
   const inChars = messages.reduce((n, m) => n + m.content.length, 0) + systemPrompt.length;
-  return { content, model: 'demo-echo', usage: { in: estimateTokens(String(inChars)), out: estimateTokens(content) } };
+  return { content, model, usage: { in: estimateTokens(String(inChars)), out: estimateTokens(content) } };
 }
 
 interface OpenAiChoice {
@@ -192,8 +202,14 @@ async function toAiError(res: Response): Promise<AiError> {
 }
 
 /** Демо печатается по словам — чтобы поведение совпадало с живым потоком. */
-async function streamDemo(messages: ChatMessage[], systemPrompt: string, onDelta: OnDelta, signal?: AbortSignal): Promise<Reply> {
-  const full = demoReply(messages, systemPrompt);
+async function streamDemo(
+  messages: ChatMessage[],
+  systemPrompt: string,
+  model: string,
+  onDelta: OnDelta,
+  signal?: AbortSignal,
+): Promise<Reply> {
+  const full = demoReply(messages, systemPrompt, model);
   const parts = full.content.match(/\S+\s*/g) ?? [full.content];
   for (const part of parts) {
     if (signal?.aborted) throw new AiError('aborted', 'остановлено');
@@ -219,7 +235,7 @@ export async function streamChat(params: {
 }): Promise<Reply> {
   const { provider, messages, systemPrompt, model, onDelta, signal } = params;
   if (!provider) throw new AiError('no_provider', 'провайдер не выбран');
-  if (provider.isDemo) return streamDemo(messages, systemPrompt, onDelta, signal);
+  if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal);
   if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
@@ -269,7 +285,7 @@ export async function requestChat(params: {
   if (provider.isDemo) {
     await new Promise((r) => setTimeout(r, 400));
     if (signal?.aborted) throw new AiError('aborted', 'остановлено');
-    return demoReply(messages, systemPrompt);
+    return demoReply(messages, systemPrompt, model);
   }
   if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
 
