@@ -68,9 +68,16 @@ await p.waitForTimeout(600);
 await p.getByRole('button', { name: 'Новый чат' }).first().click();
 await p.waitForTimeout(700);
 check((await p.textContent('h1')) === 'Новый чат', 'создан второй чат');
-await p.getByRole('button', { name: 'Чаты' }).click();
-await p.waitForTimeout(500);
-check((await p.textContent('body')).includes('Привет, проверка'), 'первый чат виден в списке');
+// Широкий экран: боковая панель постоянная, кнопки «Чаты» нет
+check((await p.textContent('body')).includes('Привет, проверка'), 'первый чат виден в боковой панели');
+check(await p.getByPlaceholder('Поиск').isVisible(), 'поиск по чатам на месте');
+// Поиск фильтрует список
+await p.getByPlaceholder('Поиск').fill('Привет');
+await p.waitForTimeout(400);
+check(!(await p.textContent('aside')).includes('Новый чат\n27'), 'поиск отфильтровал список');
+await p.getByPlaceholder('Поиск').fill('');
+// Переключатель модели в шапке
+check(await p.getByRole('button', { expanded: false }).first().isVisible(), 'переключатель модели в шапке');
 
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();

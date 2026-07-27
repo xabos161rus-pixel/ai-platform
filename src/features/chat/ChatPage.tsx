@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
-import { ArrowUp, Copy, Download, MessageSquarePlus, PanelLeft, RotateCcw, Settings, Sparkles, Square } from 'lucide-react';
+import { ArrowUp, Copy, Download, PanelLeft, RotateCcw, Settings, Sparkles, Square } from 'lucide-react';
 import { db } from '../../db/db';
 import type { Message, Provider } from '../../db/types';
 import { useToast } from '../../components/ui/toastContext';
-import { requestChat, errorText } from '../../lib/ai/client';
+import { streamChat, errorText } from '../../lib/ai/client';
 import { formatCost, modelLabel } from '../../lib/ai/models';
 import {
   addAssistantMessage,
@@ -15,22 +15,29 @@ import {
   createChat,
   exportMarkdown,
   listChats,
+  patchChat,
   removeMessage,
   toContext,
 } from '../../lib/ai/chatRepo';
 import { Markdown } from './Markdown';
-import { ChatListSheet } from './ChatListSheet';
+import { Sidebar } from './Sidebar';
+import { ModelPicker } from './ModelPicker';
 
 export function ChatPage() {
   const toast = useToast();
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  // Текст ответа во время генерации живёт в состоянии React, а НЕ в Dexie:
+  // запись каждого чанка в наблюдаемую таблицу перечитывала бы весь чат и
+  // перерисовывала ленту десятки раз в секунду. В базу уходит один раз, в конце.
+  const [streamText, setStreamText] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const creating = useRef(false);
+  const atBottom = useRef(true);
 
   const settings = useLiveQuery(() => db.settings.get('app'), []);
   const providers = useLiveQuery(async () => db.providers.toArray(), [], [] as Provider[]);
@@ -58,44 +65,73 @@ export function ChatPage() {
     });
   }, [chats, settings]);
 
-  // 'auto', а не 'smooth': плавная прокрутка на каждый ответ конфликтует с
-  // инерцией iOS и дёргает ленту.
+  // Автопрокрутка — только если человек и так внизу. Иначе лента выдёргивает
+  // из середины прошлого ответа, который он читает.
+  // Через rAF: на момент эффекта браузер ещё не пересчитал высоту ленты, и
+  // скролл «до конца» останавливался чуть выше — последняя строка пряталась
+  // за композером.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, busy]);
+    if (!atBottom.current) return;
+    const id = requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
+    return () => cancelAnimationFrame(id);
+  }, [messages.length, streamText, busy]);
 
   // Уход с экрана обрывает запрос: иначе платим за токены впустую.
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  async function ask(afterRemove?: string) {
-    if (!chat || !settings) return;
-    setBusy(true);
-    const ac = new AbortController();
-    abortRef.current = ac;
-    try {
-      if (afterRemove) await removeMessage(afterRemove);
-      const history = toContext(await chatMessages(chat.id), settings.historyLimit);
-      const reply = await requestChat({
-        provider,
-        messages: history,
-        systemPrompt: chat.systemPrompt,
-        model: chat.model,
-        signal: ac.signal,
-      });
-      await addAssistantMessage(chat.id, reply);
-    } catch (e) {
-      await addErrorMessage(chat.id, errorText(e));
-    } finally {
-      abortRef.current = null;
-      setBusy(false);
-    }
-  }
+  const ask = useCallback(
+    async (afterRemove?: string) => {
+      if (!chat || !settings) return;
+      setBusy(true);
+      setStreamText('');
+      const ac = new AbortController();
+      abortRef.current = ac;
+      // Накопленный текст держим в замыкании, а не в ref: он нужен и для
+      // отрисовки, и в обработчике остановки, а ref пришлось бы обновлять
+      // во время рендера.
+      let partial = '';
+      try {
+        if (afterRemove) await removeMessage(afterRemove);
+        const history = toContext(await chatMessages(chat.id), settings.historyLimit);
+        const reply = await streamChat({
+          provider,
+          messages: history,
+          systemPrompt: chat.systemPrompt,
+          model: chat.model,
+          signal: ac.signal,
+          onDelta: (piece) => {
+            partial += piece;
+            setStreamText(partial);
+          },
+        });
+        await addAssistantMessage(chat.id, reply);
+      } catch (e) {
+        // Прерванный ответ не выбрасываем: сохраняем то, что успело прийти —
+        // иначе человек теряет полезный текст из-за случайного «стоп».
+        if ((e as { code?: string })?.code === 'aborted' && partial.trim()) {
+          await addAssistantMessage(chat.id, {
+            content: `${partial}\n\n_(остановлено)_`,
+            model: chat.model,
+            usage: { in: 0, out: 0 },
+          });
+        } else {
+          await addErrorMessage(chat.id, errorText(e));
+        }
+      } finally {
+        abortRef.current = null;
+        setStreamText('');
+        setBusy(false);
+      }
+    },
+    [chat, settings, provider],
+  );
 
   async function handleSend() {
     const text = draft.trim();
     if (!text || busy || !chat) return;
     setDraft('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
+    atBottom.current = true;
     await addUserMessage(chat, text);
     await ask();
     inputRef.current?.focus();
@@ -105,8 +141,9 @@ export function ChatPage() {
     if (!settings) return;
     const c = await createChat(settings.activeProviderId ?? 'demo', settings.defaultModel);
     setPickedId(c.id);
-    setListOpen(false);
+    setNavOpen(false);
     setDraft('');
+    inputRef.current?.focus();
   }
 
   async function copyText(text: string) {
@@ -129,132 +166,156 @@ export function ChatPage() {
     URL.revokeObjectURL(url);
   }
 
-  return (
-    <div className="fixed inset-0 flex flex-col bg-bg">
-      <header className="flex shrink-0 items-center gap-1 border-b border-hairline px-2 pt-[calc(env(safe-area-inset-top)+8px)] pb-2">
-        <IconButton label="Чаты" onClick={() => setListOpen(true)}>
-          <PanelLeft size={20} />
-        </IconButton>
-        <div className="min-w-0 flex-1 px-1">
-          <h1 className="truncate text-[0.95rem] font-semibold">{chat?.title ?? 'AI Platform'}</h1>
-          <p className="truncate font-mono text-[var(--cc-text-caption)] text-muted">
-            {provider?.isDemo ? 'демо · без ключа' : (provider?.name ?? 'провайдер не выбран')}
-            {chat && ` · ${modelLabel(chat.model)}`}
-          </p>
-        </div>
-        <IconButton label="Экспорт" onClick={handleExport} disabled={!messages.length}>
-          <Download size={19} />
-        </IconButton>
-        <IconButton label="Новый чат" onClick={() => void handleNewChat()}>
-          <MessageSquarePlus size={20} />
-        </IconButton>
-        <Link
-          to="/settings"
-          aria-label="Настройки"
-          className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted active:opacity-60"
-        >
-          <Settings size={19} />
-        </Link>
-      </header>
+  // ⌘N — новый чат, ⌘/ — фокус в поле ввода. Без клавиатуры платформа на
+  // маке ощущается медленной, сколько бы кнопок ни было на экране.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && e.key === 'n') {
+        e.preventDefault();
+        void handleNewChat();
+      } else if (meta && e.key === '/') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
-      <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 space-y-5 overflow-y-auto px-4 py-4">
-        {!messages.length && <Welcome demo={provider?.isDemo ?? false} />}
-        {messages.map((m) =>
-          m.role === 'user' ? (
-            <UserBubble key={m.id} message={m} />
-          ) : (
-            <AssistantBlock
-              key={m.id}
-              message={m}
-              busy={busy}
-              onCopy={() => void copyText(m.content)}
-              onRetry={() => void ask(m.id)}
+  return (
+    <div className="fixed inset-0 flex bg-bg">
+      <Sidebar chats={list} activeId={chatId} onPick={setPickedId} onNew={() => void handleNewChat()} />
+
+      {/* Мобильная панель поверх экрана */}
+      {navOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <button aria-label="Закрыть" className="animate-fade-in absolute inset-0 bg-black/50" onClick={() => setNavOpen(false)} />
+          <div className="relative animate-fade-in">
+            <Sidebar
+              chats={list}
+              activeId={chatId}
+              onPick={(id) => {
+                setPickedId(id);
+                setNavOpen(false);
+              }}
+              onNew={() => void handleNewChat()}
+              overlay
+              onClose={() => setNavOpen(false)}
             />
-          ),
-        )}
-        {busy && <Pending />}
-        <div ref={bottomRef} />
-      </div>
+          </div>
+        </div>
+      )}
 
-      <div className="shrink-0 border-t border-hairline bg-bg">
-        <div className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+10px)]">
-          <textarea
-            ref={inputRef}
-            value={draft}
-            rows={1}
-            placeholder="Спросите что угодно…"
-            className="max-h-44 min-h-[var(--cc-touch)] flex-1 resize-none rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 outline-none placeholder:text-muted"
-            onChange={(e) => {
-              setDraft(e.target.value);
-              // Авторост: сбрасываем высоту перед замером, иначе поле не сжимается.
-              e.target.style.height = 'auto';
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 176)}px`;
-            }}
-            onKeyDown={(e) => {
-              // Enter отправляет только с физической клавиатурой: на телефоне
-              // это перевод строки, иначе многострочное не написать.
-              if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(pointer: fine)').matches) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-          />
-          {busy ? (
-            <button
-              aria-label="Остановить"
-              className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-surface-2 active:opacity-70"
-              onClick={() => abortRef.current?.abort()}
-            >
-              <Square size={15} />
-            </button>
-          ) : (
-            <button
-              aria-label="Отправить"
-              disabled={!draft.trim()}
-              className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-accent text-white transition-opacity active:opacity-80 disabled:opacity-25"
-              onClick={() => void handleSend()}
-            >
-              <ArrowUp size={19} />
-            </button>
-          )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex shrink-0 items-center gap-1 border-b border-hairline px-2 pt-[calc(env(safe-area-inset-top)+8px)] pb-2">
+          <button
+            aria-label="Чаты"
+            onClick={() => setNavOpen(true)}
+            className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted active:opacity-60 lg:hidden"
+          >
+            <PanelLeft size={20} />
+          </button>
+          <div className="min-w-0 flex-1 px-1">
+            <h1 className="truncate text-[0.95rem] font-semibold">{chat?.title ?? 'AI Platform'}</h1>
+            {chat && (
+              <ModelPicker
+                providers={providers}
+                providerId={chat.providerId}
+                model={chat.model}
+                onChange={(providerId, model) => void patchChat(chat.id, { providerId, model })}
+              />
+            )}
+          </div>
+          <button
+            aria-label="Экспорт"
+            onClick={handleExport}
+            disabled={!messages.length}
+            className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
+          >
+            <Download size={18} />
+          </button>
+          <Link
+            to="/settings"
+            aria-label="Настройки"
+            className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 lg:hidden"
+          >
+            <Settings size={18} />
+          </Link>
+        </header>
+
+        <div
+          className="min-h-0 flex-1 overflow-y-auto"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          }}
+        >
+          <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-5">
+            {!messages.length && !streamText && <Welcome demo={provider?.isDemo ?? false} />}
+            {messages.map((m) =>
+              m.role === 'user' ? (
+                <UserBubble key={m.id} message={m} />
+              ) : (
+                <AssistantBlock
+                  key={m.id}
+                  message={m}
+                  busy={busy}
+                  onCopy={() => void copyText(m.content)}
+                  onRetry={() => void ask(m.id)}
+                />
+              ),
+            )}
+            {busy && <Streaming text={streamText} />}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-hairline bg-bg">
+          <div className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+10px)]">
+            <textarea
+              ref={inputRef}
+              value={draft}
+              rows={1}
+              placeholder="Спросите что угодно…"
+              className="max-h-44 min-h-[var(--cc-touch)] flex-1 resize-none rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 outline-none transition-shadow placeholder:text-muted focus:shadow-[0_0_0_1px_var(--app-accent)]"
+              onChange={(e) => {
+                setDraft(e.target.value);
+                // Авторост: сбрасываем высоту перед замером, иначе не сжимается.
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 176)}px`;
+              }}
+              onKeyDown={(e) => {
+                // Enter отправляет только с физической клавиатурой: на телефоне
+                // это перевод строки, иначе многострочное не написать.
+                if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(pointer: fine)').matches) {
+                  e.preventDefault();
+                  void handleSend();
+                }
+              }}
+            />
+            {busy ? (
+              <button
+                aria-label="Остановить"
+                className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-surface-2 transition-opacity active:opacity-70"
+                onClick={() => abortRef.current?.abort()}
+              >
+                <Square size={15} />
+              </button>
+            ) : (
+              <button
+                aria-label="Отправить"
+                disabled={!draft.trim()}
+                className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:opacity-25"
+                onClick={() => void handleSend()}
+              >
+                <ArrowUp size={19} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
-
-      <ChatListSheet
-        open={listOpen}
-        chats={list}
-        activeId={chatId}
-        onClose={() => setListOpen(false)}
-        onPick={(id) => {
-          setPickedId(id);
-          setListOpen(false);
-        }}
-        onNew={() => void handleNewChat()}
-      />
     </div>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  disabled,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted active:opacity-60 disabled:opacity-25"
-    >
-      {children}
-    </button>
   );
 }
 
@@ -300,19 +361,20 @@ function AssistantBlock({
   const failed = message.status === 'error';
   const cost = formatCost(message.costRub);
   return (
-    <div className="grid grid-cols-[var(--cc-marker-col)_1fr]">
+    <div className="group grid grid-cols-[var(--cc-marker-col)_1fr]">
       <div aria-hidden className="pt-[0.55rem]">
         <span className={`block size-1.5 rounded-full ${failed ? 'bg-danger' : 'bg-accent'}`} />
       </div>
       <div className="min-w-0">
         {failed ? <p className="text-sm text-danger">{message.error}</p> : <Markdown text={message.content} />}
-        <div className="mt-2 flex items-center gap-3 font-mono text-[var(--cc-text-caption)] text-muted">
-          {!failed && message.tokensIn !== null && (
+        <div className="mt-2 flex items-center gap-3 font-mono text-[var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
+          {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
             <span>
               {message.tokensIn}→{message.tokensOut}
               {cost && ` · ${cost}`}
             </span>
-          )}
+          ) : null}
+          {!failed && message.model && <span className="truncate">{modelLabel(message.model)}</span>}
           {!failed && (
             <button aria-label="Скопировать" className="p-1 active:opacity-60" onClick={onCopy}>
               <Copy size={13} />
@@ -332,15 +394,25 @@ function AssistantBlock({
   );
 }
 
-function Pending() {
+/** Ответ во время генерации: тот же рендер, что и у готового, плюс каретка. */
+function Streaming({ text }: { text: string }) {
   return (
     <div className="grid grid-cols-[var(--cc-marker-col)_1fr]">
       <div aria-hidden className="pt-[0.55rem]">
         <span className="block size-1.5 animate-pulse rounded-full bg-accent" />
       </div>
-      <p className="font-mono text-[var(--cc-text-meta)] text-muted">
-        думает<span className="animate-caret">▍</span>
-      </p>
+      <div className="min-w-0">
+        {text ? (
+          <>
+            <Markdown text={text} />
+            <span className="animate-caret -mt-1 inline-block text-accent">▍</span>
+          </>
+        ) : (
+          <p className="font-mono text-[var(--cc-text-meta)] text-muted">
+            думает<span className="animate-caret">▍</span>
+          </p>
+        )}
+      </div>
     </div>
   );
 }

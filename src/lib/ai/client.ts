@@ -112,6 +112,151 @@ interface OpenAiResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
+/** Кусок ответа по мере генерации. */
+export type OnDelta = (chunk: string) => void;
+
+interface StreamChunk {
+  choices?: { delta?: { content?: string } }[];
+  model?: string;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+/**
+ * Разбор SSE-потока OpenAI-совместимого API.
+ *
+ * Буфер обязателен: сетевой чанк рвётся на произвольном байте, и половина
+ * строки `data: {...}` регулярно приезжает в следующем чтении. Без склейки
+ * JSON.parse падал бы на каждом длинном ответе.
+ */
+async function readSse(res: Response, onDelta: OnDelta): Promise<{ text: string; model: string; usage: Usage }> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new AiError('provider', 'ответ без тела');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+  let model = '';
+  const usage: Usage = { in: 0, out: 0 };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // Разделитель событий — пустая строка; обрабатываем всё, кроме хвоста.
+    const parts = buffer.split('\n');
+    buffer = parts.pop() ?? '';
+    for (const line of parts) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === '[DONE]') continue;
+      let chunk: StreamChunk;
+      try {
+        chunk = JSON.parse(payload) as StreamChunk;
+      } catch {
+        continue; // недособранное или служебное событие — пропускаем
+      }
+      if (chunk.model) model = chunk.model;
+      // usage приходит последним событием, когда включён stream_options.
+      if (chunk.usage) {
+        usage.in = Number(chunk.usage.prompt_tokens) || usage.in;
+        usage.out = Number(chunk.usage.completion_tokens) || usage.out;
+      }
+      const piece = chunk.choices?.[0]?.delta?.content;
+      if (piece) {
+        text += piece;
+        onDelta(piece);
+      }
+    }
+  }
+  return { text, model, usage };
+}
+
+/** Разбор тела ошибки провайдера в понятный код. */
+async function toAiError(res: Response): Promise<AiError> {
+  const raw = await res.text().catch(() => '');
+  let msg = raw.slice(0, 300);
+  try {
+    const j = JSON.parse(raw) as { error?: { message?: string }; message?: string };
+    msg = j.error?.message ?? j.message ?? msg;
+  } catch {
+    /* тело не JSON — оставляем как есть */
+  }
+  if (res.status === 401) return new AiError('unauthorized', msg);
+  // 403 у зарубежных провайдеров чаще означает регион, а не права ключа.
+  if (res.status === 403) {
+    return new AiError(/region|country|location|unsupported_country/i.test(msg) ? 'geo_blocked' : 'forbidden', msg);
+  }
+  if (res.status === 429) return new AiError('rate_limit', msg);
+  if (res.status === 400) return new AiError('bad_request', msg);
+  return new AiError('provider', msg || `HTTP ${res.status}`);
+}
+
+/** Демо печатается по словам — чтобы поведение совпадало с живым потоком. */
+async function streamDemo(messages: ChatMessage[], systemPrompt: string, onDelta: OnDelta, signal?: AbortSignal): Promise<Reply> {
+  const full = demoReply(messages, systemPrompt);
+  const parts = full.content.match(/\S+\s*/g) ?? [full.content];
+  for (const part of parts) {
+    if (signal?.aborted) throw new AiError('aborted', 'остановлено');
+    await new Promise((r) => setTimeout(r, 12));
+    onDelta(part);
+  }
+  return full;
+}
+
+/**
+ * Отправка с потоковым ответом. onDelta вызывается на каждый кусок текста —
+ * вызывающий копит его в состоянии React и пишет в базу один раз, в конце:
+ * запись каждого чанка в наблюдаемую таблицу перерисовывала бы всю ленту
+ * десятки раз в секунду.
+ */
+export async function streamChat(params: {
+  provider: Provider | null;
+  messages: ChatMessage[];
+  systemPrompt: string;
+  model: string;
+  onDelta: OnDelta;
+  signal?: AbortSignal;
+}): Promise<Reply> {
+  const { provider, messages, systemPrompt, model, onDelta, signal } = params;
+  if (!provider) throw new AiError('no_provider', 'провайдер не выбран');
+  if (provider.isDemo) return streamDemo(messages, systemPrompt, onDelta, signal);
+  if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
+
+  const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages,
+        stream: true,
+        // Просим прислать usage последним событием. Провайдеры, которые этого
+        // не умеют, поле просто игнорируют — тогда счётчик останется нулевым,
+        // и лучше показать ноль, чем выдуманную оценку.
+        stream_options: { include_usage: true },
+      }),
+      signal,
+    });
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', 'остановлено');
+    throw new AiError('network', 'нет связи');
+  }
+  if (!res.ok) throw await toAiError(res);
+
+  try {
+    const { text, model: gotModel, usage } = await readSse(res, onDelta);
+    if (!text.trim()) throw new AiError('provider', 'провайдер вернул пустой ответ');
+    return { content: text, model: gotModel || model, usage };
+  } catch (e) {
+    if (e instanceof AiError) throw e;
+    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', 'остановлено');
+    throw new AiError('network', 'поток оборван');
+  }
+}
+
+/** Запрос без потока — оставлен для случаев, где стрим не нужен. */
 export async function requestChat(params: {
   provider: Provider | null;
   messages: ChatMessage[];
@@ -121,52 +266,30 @@ export async function requestChat(params: {
 }): Promise<Reply> {
   const { provider, messages, systemPrompt, model, signal } = params;
   if (!provider) throw new AiError('no_provider', 'провайдер не выбран');
-
-  // Демо отвечает мгновенно; небольшая задержка нужна, чтобы был виден
-  // индикатор ожидания и поведение совпадало с настоящим запросом.
   if (provider.isDemo) {
     await new Promise((r) => setTimeout(r, 400));
     if (signal?.aborted) throw new AiError('aborted', 'остановлено');
     return demoReply(messages, systemPrompt);
   }
-
   if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
-  const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  const body = {
-    model,
-    messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages,
-  };
 
+  const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
   let res: Response;
   try {
     res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model,
+        messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages,
+      }),
       signal,
     });
   } catch (e) {
     if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', 'остановлено');
     throw new AiError('network', 'нет связи');
   }
-
-  if (!res.ok) {
-    const raw = await res.text().catch(() => '');
-    let msg = raw.slice(0, 300);
-    try {
-      const j = JSON.parse(raw) as { error?: { message?: string }; message?: string };
-      msg = j.error?.message ?? j.message ?? msg;
-    } catch {
-      /* тело не JSON — оставляем как есть */
-    }
-    if (res.status === 401) throw new AiError('unauthorized', msg);
-    // 403 у зарубежных провайдеров чаще всего означает именно регион, а не
-    // права ключа — подсказываем это в тексте ошибки.
-    if (res.status === 403) throw new AiError(/region|country|location/i.test(msg) ? 'geo_blocked' : 'forbidden', msg);
-    if (res.status === 429) throw new AiError('rate_limit', msg);
-    if (res.status === 400) throw new AiError('bad_request', msg);
-    throw new AiError('provider', msg || `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw await toAiError(res);
 
   const data = (await res.json()) as OpenAiResponse;
   const content = data.choices?.[0]?.message?.content;

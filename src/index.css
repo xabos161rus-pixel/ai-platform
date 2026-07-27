@@ -244,3 +244,58 @@ select {
   white-space: nowrap;
 }
 .cc-md th { font-weight: 600; background-color: var(--app-surface-2); }
+
+/* ── Подсветка кода ─────────────────────────────────────────────────
+   Своя тема вместо готовой из highlight.js: стандартные темы написаны под
+   чужие палитры и в этом интерфейсе смотрятся инородно. Здесь всего четыре
+   роли (ключевое / строка / число-константа / комментарий) — плотная радуга
+   из десяти цветов мешает читать код, а не помогает. */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-name,
+.hljs-strong { color: var(--app-accent); }
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string { color: oklch(0.78 0.11 150); }
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-built_in,
+.hljs-type { color: oklch(0.82 0.09 85); }
+
+.hljs-comment,
+.hljs-quote,
+.hljs-deletion,
+.hljs-meta { color: var(--app-muted); font-style: italic; }
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-attr,
+.hljs-selector-id,
+.hljs-selector-class { color: oklch(0.80 0.075 250); }
+
+:root.light .hljs-string,
+:root.light .hljs-regexp,
+:root.light .hljs-addition,
+:root.light .hljs-attribute { color: oklch(0.46 0.12 150); }
+:root.light .hljs-number,
+:root.light .hljs-built_in,
+:root.light .hljs-type,
+:root.light .hljs-variable { color: oklch(0.50 0.10 75); }
+:root.light .hljs-title,
+:root.light .hljs-attr,
+:root.light .hljs-selector-class { color: oklch(0.48 0.10 250); }
+
+/* Заголовок блока кода с языком — как в терминале, слева сверху. */
+.cc-md pre { position: relative; }
+.cc-md pre code.hljs { background: none; padding: 0; }
