@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, useNavigate } from 'react-router';
-import { ArrowUp, Copy, Download, PanelLeft, RotateCcw, Settings, Sparkles, Square } from 'lucide-react';
+import { ArrowUp, Copy, Download, PanelLeft, Paperclip, RotateCcw, ScrollText, Settings, Sparkles, Square, X } from 'lucide-react';
 import { db } from '../../db/db';
 import type { Message, Provider } from '../../db/types';
 import { useToast } from '../../components/ui/toastContext';
 import { streamChat, errorText } from '../../lib/ai/client';
+import { compressImage, MAX_IMAGES } from '../../lib/images';
 import { formatCost, modelLabel } from '../../lib/ai/models';
 import {
   addAssistantMessage,
@@ -20,11 +21,13 @@ import {
   toContext,
 } from '../../lib/ai/chatRepo';
 import { Markdown } from './Markdown';
+import { LiveReasoning, ReasoningBlock } from './ReasoningBlock';
 import { Sidebar } from './Sidebar';
 import { ModelPicker } from './ModelPicker';
 import { CompareGroup } from './CompareGroup';
 import { CompareBar } from './CompareBar';
 import { CommandPalette } from './CommandPalette';
+import { PersonaSheet } from './PersonaSheet';
 import { groupRuns } from '../../lib/ai/chatRepo';
 import { uid } from '../../lib/repo';
 
@@ -39,12 +42,19 @@ export function ChatPage() {
   // запись каждого чанка в наблюдаемую таблицу перечитывала бы весь чат и
   // перерисовывала ленту десятки раз в секунду. В базу уходит один раз, в конце.
   const [streamText, setStreamText] = useState('');
+  // Мысли модели во время генерации — отдельно от текста ответа, тоже вне
+  // Dexie, по той же причине (частота обновлений).
+  const [streamThink, setStreamThink] = useState('');
   // Потоки колонок сравнения: индекс колонки → накопленный текст.
   const [compareStream, setCompareStream] = useState<Record<number, string>>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
+  const [viewer, setViewer] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const creating = useRef(false);
   const atBottom = useRef(true);
 
@@ -93,12 +103,14 @@ export function ChatPage() {
       if (!chat || !settings) return;
       setBusy(true);
       setStreamText('');
+      setStreamThink('');
       const ac = new AbortController();
       abortRef.current = ac;
       // Накопленный текст держим в замыкании, а не в ref: он нужен и для
       // отрисовки, и в обработчике остановки, а ref пришлось бы обновлять
       // во время рендера.
       let partial = '';
+      let think = '';
       try {
         if (afterRemove) await removeMessage(afterRemove);
         const history = toContext(await chatMessages(chat.id), settings.historyLimit);
@@ -112,11 +124,17 @@ export function ChatPage() {
             partial += piece;
             setStreamText(partial);
           },
+          onReasoning: (piece) => {
+            think += piece;
+            setStreamThink(think);
+          },
         });
         await addAssistantMessage(chat.id, reply);
       } catch (e) {
         // Прерванный ответ не выбрасываем: сохраняем то, что успело прийти —
         // иначе человек теряет полезный текст из-за случайного «стоп».
+        // Частичные мысли не сохраняем: недописанные мысли не несут ценности
+        // и усложняют ветку аборта.
         if ((e as { code?: string })?.code === 'aborted' && partial.trim()) {
           await addAssistantMessage(chat.id, {
             content: `${partial}\n\n_(остановлено)_`,
@@ -129,6 +147,7 @@ export function ChatPage() {
       } finally {
         abortRef.current = null;
         setStreamText('');
+        setStreamThink('');
         setBusy(false);
       }
     },
@@ -183,13 +202,32 @@ export function ChatPage() {
     [chat, settings, providers],
   );
 
+  // Сжимаем и добавляем картинки по одной: одна битая не должна ронять
+  // остальные, а лимит режем ДО чтения — чтобы не тратить время на файлы,
+  // которые всё равно не влезут.
+  async function addFiles(list: ArrayLike<File | null> | FileList | null) {
+    const files = Array.from(list ?? []).filter((f): f is File => !!f && f.type.startsWith('image/'));
+    const room = MAX_IMAGES - images.length;
+    if (files.length > room) toast('Не больше 4 изображений');
+    for (const f of files.slice(0, room)) {
+      try {
+        const url = await compressImage(f);
+        setImages((prev) => (prev.length >= MAX_IMAGES ? prev : [...prev, url]));
+      } catch {
+        toast('Не удалось прочитать изображение');
+      }
+    }
+  }
+
   async function handleSend() {
     const text = draft.trim();
-    if (!text || busy || !chat) return;
+    if ((!text && !images.length) || busy || !chat) return;
     setDraft('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
     atBottom.current = true;
-    await addUserMessage(chat, text);
+    const imgs = images;
+    setImages([]);
+    await addUserMessage(chat, text, imgs.length ? imgs : undefined);
     if (comparePicks.length > 1) await askCompare(comparePicks);
     else await ask();
     inputRef.current?.focus();
@@ -238,6 +276,8 @@ export function ChatPage() {
       } else if (meta && e.key === '/') {
         e.preventDefault();
         inputRef.current?.focus();
+      } else if (e.key === 'Escape' && viewer) {
+        setViewer(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -300,6 +340,16 @@ export function ChatPage() {
             )}
           </div>
           <button
+            aria-label="Системный промпт"
+            onClick={() => setPromptOpen(true)}
+            disabled={!chat}
+            className={`grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors active:opacity-60 ${
+              chat?.systemPrompt ? 'text-accent' : 'text-muted hover:text-text'
+            }`}
+          >
+            <ScrollText size={18} />
+          </button>
+          <button
             aria-label="Экспорт"
             onClick={handleExport}
             disabled={!messages.length}
@@ -329,7 +379,7 @@ export function ChatPage() {
               Array.isArray(item) ? (
                 <CompareGroup key={item[0].id} group={item} onCopy={(t) => void copyText(t)} />
               ) : item.role === 'user' ? (
-                <UserBubble key={item.id} message={item} />
+                <UserBubble key={item.id} message={item} onView={setViewer} />
               ) : (
                 <AssistantBlock
                   key={item.id}
@@ -344,7 +394,7 @@ export function ChatPage() {
               (comparePicks.length > 1 ? (
                 <StreamingCompare picks={comparePicks} texts={compareStream} />
               ) : (
-                <Streaming text={streamText} />
+                <Streaming text={streamText} think={streamThink} />
               ))}
             <div ref={bottomRef} />
           </div>
@@ -358,7 +408,43 @@ export function ChatPage() {
               onChange={(keys) => void setComparePicks(keys)}
             />
           </div>
+          {images.length > 0 && (
+            <div className="mx-auto flex w-full max-w-3xl gap-2 px-4 pt-2">
+              {images.map((src, i) => (
+                <div key={i} className="relative shrink-0">
+                  <img src={src} alt="вложение" className="size-14 rounded-[var(--cc-radius-sm)] border border-hairline object-cover" />
+                  <button
+                    aria-label="Убрать изображение"
+                    className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-hairline bg-surface-2 text-muted active:opacity-60"
+                    onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+10px)]">
+            <button
+              aria-label="Прикрепить изображение"
+              disabled={busy || images.length >= MAX_IMAGES}
+              onClick={() => fileRef.current?.click()}
+              className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
+            >
+              <Paperclip size={19} />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void addFiles(e.target.files);
+                // Сброс value — иначе повторный выбор того же файла не даёт события change.
+                e.target.value = '';
+              }}
+            />
             <textarea
               ref={inputRef}
               value={draft}
@@ -379,6 +465,16 @@ export function ChatPage() {
                   void handleSend();
                 }
               }}
+              onPaste={(e) => {
+                // Картинки из буфера — как выбор файлов; текстовые вставки не трогаем.
+                const files = Array.from(e.clipboardData.items)
+                  .filter((i) => i.type.startsWith('image/'))
+                  .map((i) => i.getAsFile());
+                if (files.length) {
+                  e.preventDefault();
+                  void addFiles(files);
+                }
+              }}
             />
             {busy ? (
               <button
@@ -391,7 +487,7 @@ export function ChatPage() {
             ) : (
               <button
                 aria-label="Отправить"
-                disabled={!draft.trim()}
+                disabled={!draft.trim() && !images.length}
                 className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:opacity-25"
                 onClick={() => void handleSend()}
               >
@@ -401,6 +497,13 @@ export function ChatPage() {
           </div>
         </div>
       </div>
+
+      <PersonaSheet
+        key={promptOpen ? (chat?.id ?? 'none') : 'closed'}
+        open={promptOpen}
+        chat={chat}
+        onClose={() => setPromptOpen(false)}
+      />
 
       <CommandPalette
         open={paletteOpen}
@@ -422,6 +525,15 @@ export function ChatPage() {
         }}
         onOpenSettings={() => navigate('/settings')}
       />
+
+      {viewer && (
+        <div
+          className="animate-fade-in fixed inset-0 z-[80] grid place-items-center bg-black/80 p-3"
+          onClick={() => setViewer(null)}
+        >
+          <img src={viewer} alt="изображение" className="max-h-[92dvh] max-w-full rounded-[var(--cc-radius)]" />
+        </div>
+      )}
     </div>
   );
 }
@@ -444,11 +556,24 @@ function Welcome({ demo }: { demo: boolean }) {
 
 /** Вопрос — пузырь справа. Ответ пузырём НЕ оформляем: в Claude Code это
  *  поток на всю ширину с маркером, и эта асимметрия узнаётся сразу. */
-function UserBubble({ message }: { message: Message }) {
+function UserBubble({ message, onView }: { message: Message; onView: (src: string) => void }) {
   return (
     <div className="flex justify-end">
       <div className="max-w-[85%] rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-[var(--cc-text-body)] whitespace-pre-wrap">
-        {message.content}
+        {message.images?.length ? (
+          <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
+            {message.images.map((src, i) => (
+              <button key={i} onClick={() => onView(src)} className="active:opacity-70">
+                <img
+                  src={src}
+                  alt="вложение"
+                  className="h-28 w-auto max-w-full cursor-zoom-in rounded-[var(--cc-radius-sm)] border border-hairline object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {message.content ? message.content : null}
       </div>
     </div>
   );
@@ -473,7 +598,14 @@ function AssistantBlock({
         <span className={`block size-1.5 rounded-full ${failed ? 'bg-danger' : 'bg-accent'}`} />
       </div>
       <div className="min-w-0">
-        {failed ? <p className="text-sm text-danger">{message.error}</p> : <Markdown text={message.content} />}
+        {failed ? (
+          <p className="text-sm text-danger">{message.error}</p>
+        ) : (
+          <>
+            {message.reasoning && <ReasoningBlock text={message.reasoning} />}
+            <Markdown text={message.content} />
+          </>
+        )}
         <div className="mt-2 flex items-center gap-3 font-mono text-[var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
           {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
             <span>
@@ -544,23 +676,24 @@ function StreamingCompare({
 }
 
 /** Ответ во время генерации: тот же рендер, что и у готового, плюс каретка. */
-function Streaming({ text }: { text: string }) {
+function Streaming({ text, think }: { text: string; think: string }) {
   return (
     <div className="grid grid-cols-[var(--cc-marker-col)_1fr]">
       <div aria-hidden className="pt-[0.55rem]">
         <span className="block size-1.5 animate-pulse rounded-full bg-accent" />
       </div>
       <div className="min-w-0">
+        {think && <LiveReasoning text={think} />}
         {text ? (
           <>
             <Markdown text={text} />
             <span className="animate-caret -mt-1 inline-block text-accent">▍</span>
           </>
-        ) : (
+        ) : !think ? (
           <p className="font-mono text-[var(--cc-text-meta)] text-muted">
             думает<span className="animate-caret">▍</span>
           </p>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import type { Message } from '../../db/types';
 import { formatCost, modelLabel } from '../../lib/ai/models';
 import { chooseWinner } from '../../lib/ai/chatRepo';
 import { Markdown } from './Markdown';
+import { ReasoningBlock } from './ReasoningBlock';
 
 interface Props {
   group: Message[];
@@ -73,7 +74,10 @@ export function CompareGroup({ group, onCopy }: Props) {
               {m.status === 'error' ? (
                 <p className="text-sm text-danger">{m.error}</p>
               ) : (
-                <Markdown text={m.content} />
+                <>
+                  {m.reasoning && <ReasoningBlock text={m.reasoning} />}
+                  <Markdown text={m.content} />
+                </>
               )}
 
               <footer className="mt-2 flex items-center gap-2 border-t border-hairline pt-2 font-mono text-[var(--cc-text-caption)] text-muted">

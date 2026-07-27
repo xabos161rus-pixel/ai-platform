@@ -20,11 +20,31 @@ export interface Reply {
   content: string;
   model: string;
   usage: Usage;
+  reasoning?: string;
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  images?: string[];
+}
+
+/** Часть мультимодального сообщения в wire-формате OpenAI-совместимого API. */
+type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+
+/**
+ * Упаковка сообщений в wire-формат. Без картинок content остаётся строкой —
+ * максимальная совместимость с провайдерами без vision. С картинками —
+ * массив частей: текст (если есть) плюс по одной части на каждый dataURL.
+ */
+function toWire(messages: ChatMessage[]): { role: 'user' | 'assistant'; content: string | ContentPart[] }[] {
+  return messages.map((m) => {
+    if (!m.images?.length) return { role: m.role, content: m.content };
+    const parts: ContentPart[] = [];
+    if (m.content.trim()) parts.push({ type: 'text', text: m.content });
+    for (const url of m.images) parts.push({ type: 'image_url', image_url: { url } });
+    return { role: m.role, content: parts };
+  });
 }
 
 export type ErrorCode =
@@ -78,17 +98,21 @@ export function errorText(e: unknown): string {
 /** Ответ демо-провайдера: платформа работает сразу после установки. */
 function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-echo'): Reply {
   const last = messages[messages.length - 1];
+  const imgs = last.images?.length ?? 0;
   if (model === 'demo-fast') {
-    const short = [
+    const lines = [
       '**Демо · краткий.** Вторая модель отвечает иначе — так видно смысл сравнения.',
       '',
       `Вопрос: «${last.content.slice(0, 120)}»`,
       '',
       `Сообщений в контексте: ${messages.length}`,
-    ].join('\n');
+    ];
+    if (imgs > 0) lines.push('', `Изображений: ${imgs}`);
+    const short = lines.join('\n');
+    // demo-fast намеренно не шлёт reasoning — живой пример модели без мыслей.
     return { content: short, model, usage: { in: estimateTokens(last.content), out: estimateTokens(short) } };
   }
-  const content = [
+  const lines = [
     '**Демо-режим.** Провайдер не подключён — отвечает встроенная заглушка.',
     '',
     'Ваш вопрос:',
@@ -96,6 +120,9 @@ function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-
     `> ${last.content.slice(0, 500).replace(/\n/g, '\n> ')}`,
     '',
     `Сообщений в контексте: ${messages.length}${systemPrompt ? ' · системный промпт задан' : ''}`,
+  ];
+  if (imgs > 0) lines.push('', `Вижу изображений: ${imgs}.`);
+  lines.push(
     '',
     'Чтобы получать настоящие ответы, добавьте провайдера в настройках:',
     '',
@@ -108,13 +135,19 @@ function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-
     '// проверка блока кода',
     'const ok = true;',
     '```',
-  ].join('\n');
+  );
+  const content = lines.join('\n');
   const inChars = messages.reduce((n, m) => n + m.content.length, 0) + systemPrompt.length;
-  return { content, model, usage: { in: estimateTokens(String(inChars)), out: estimateTokens(content) } };
+  return {
+    content,
+    model,
+    usage: { in: estimateTokens(String(inChars)), out: estimateTokens(content) },
+    reasoning: `Разбираю вопрос: «${last.content.slice(0, 80)}». Это демо — показываю, как выглядят мысли модели до ответа.`,
+  };
 }
 
 interface OpenAiChoice {
-  message?: { content?: string };
+  message?: { content?: string; reasoning_content?: string; reasoning?: string };
 }
 interface OpenAiResponse {
   choices?: OpenAiChoice[];
@@ -126,7 +159,7 @@ interface OpenAiResponse {
 export type OnDelta = (chunk: string) => void;
 
 interface StreamChunk {
-  choices?: { delta?: { content?: string } }[];
+  choices?: { delta?: { content?: string; reasoning_content?: string; reasoning?: string } }[];
   model?: string;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
@@ -138,12 +171,17 @@ interface StreamChunk {
  * строки `data: {...}` регулярно приезжает в следующем чтении. Без склейки
  * JSON.parse падал бы на каждом длинном ответе.
  */
-async function readSse(res: Response, onDelta: OnDelta): Promise<{ text: string; model: string; usage: Usage }> {
+async function readSse(
+  res: Response,
+  onDelta: OnDelta,
+  onReasoning?: OnDelta,
+): Promise<{ text: string; reasoning: string; model: string; usage: Usage }> {
   const reader = res.body?.getReader();
   if (!reader) throw new AiError('provider', 'ответ без тела');
   const decoder = new TextDecoder();
   let buffer = '';
   let text = '';
+  let reasoning = '';
   let model = '';
   const usage: Usage = { in: 0, out: 0 };
 
@@ -171,14 +209,22 @@ async function readSse(res: Response, onDelta: OnDelta): Promise<{ text: string;
         usage.in = Number(chunk.usage.prompt_tokens) || usage.in;
         usage.out = Number(chunk.usage.completion_tokens) || usage.out;
       }
-      const piece = chunk.choices?.[0]?.delta?.content;
+      const d = chunk.choices?.[0]?.delta;
+      // Разные провайдеры шлют мысли в разных полях (DeepSeek/OpenRouter-стиль
+      // vs остальные) — читаем оба, до обработки основного текста.
+      const think = d?.reasoning_content ?? d?.reasoning;
+      if (think) {
+        reasoning += think;
+        onReasoning?.(think);
+      }
+      const piece = d?.content;
       if (piece) {
         text += piece;
         onDelta(piece);
       }
     }
   }
-  return { text, model, usage };
+  return { text, reasoning, model, usage };
 }
 
 /** Разбор тела ошибки провайдера в понятный код. */
@@ -208,8 +254,17 @@ async function streamDemo(
   model: string,
   onDelta: OnDelta,
   signal?: AbortSignal,
+  onReasoning?: OnDelta,
 ): Promise<Reply> {
   const full = demoReply(messages, systemPrompt, model);
+  if (full.reasoning && onReasoning) {
+    const thinkParts = full.reasoning.match(/\S+\s*/g) ?? [full.reasoning];
+    for (const part of thinkParts) {
+      if (signal?.aborted) throw new AiError('aborted', 'остановлено');
+      await new Promise((r) => setTimeout(r, 8));
+      onReasoning(part);
+    }
+  }
   const parts = full.content.match(/\S+\s*/g) ?? [full.content];
   for (const part of parts) {
     if (signal?.aborted) throw new AiError('aborted', 'остановлено');
@@ -231,14 +286,16 @@ export async function streamChat(params: {
   systemPrompt: string;
   model: string;
   onDelta: OnDelta;
+  onReasoning?: OnDelta;
   signal?: AbortSignal;
 }): Promise<Reply> {
-  const { provider, messages, systemPrompt, model, onDelta, signal } = params;
+  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal } = params;
   if (!provider) throw new AiError('no_provider', 'провайдер не выбран');
-  if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal);
+  if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal, onReasoning);
   if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const wireMessages = toWire(messages);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -246,7 +303,7 @@ export async function streamChat(params: {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
       body: JSON.stringify({
         model,
-        messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages,
+        messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...wireMessages] : wireMessages,
         stream: true,
         // Просим прислать usage последним событием. Провайдеры, которые этого
         // не умеют, поле просто игнорируют — тогда счётчик останется нулевым,
@@ -262,9 +319,9 @@ export async function streamChat(params: {
   if (!res.ok) throw await toAiError(res);
 
   try {
-    const { text, model: gotModel, usage } = await readSse(res, onDelta);
+    const { text, reasoning, model: gotModel, usage } = await readSse(res, onDelta, onReasoning);
     if (!text.trim()) throw new AiError('provider', 'провайдер вернул пустой ответ');
-    return { content: text, model: gotModel || model, usage };
+    return { content: text, model: gotModel || model, usage, reasoning: reasoning.trim() ? reasoning : undefined };
   } catch (e) {
     if (e instanceof AiError) throw e;
     if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', 'остановлено');
@@ -290,6 +347,7 @@ export async function requestChat(params: {
   if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const wireMessages = toWire(messages);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -297,7 +355,7 @@ export async function requestChat(params: {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
       body: JSON.stringify({
         model,
-        messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages,
+        messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...wireMessages] : wireMessages,
       }),
       signal,
     });
@@ -310,6 +368,7 @@ export async function requestChat(params: {
   const data = (await res.json()) as OpenAiResponse;
   const content = data.choices?.[0]?.message?.content;
   if (typeof content !== 'string') throw new AiError('provider', 'пустой ответ провайдера');
+  const think = data.choices?.[0]?.message?.reasoning_content ?? data.choices?.[0]?.message?.reasoning;
   return {
     content,
     model: data.model ?? model,
@@ -317,5 +376,6 @@ export async function requestChat(params: {
       in: Number(data.usage?.prompt_tokens) || 0,
       out: Number(data.usage?.completion_tokens) || 0,
     },
+    reasoning: think?.trim() ? think : undefined,
   };
 }

@@ -51,3 +51,10 @@ export function formatCost(rub: number | null): string {
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);
 }
+
+/** Компактная запись количества токенов для разбивки расходов по моделям. */
+export function formatTokens(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1).replace('.', ',')}к`;
+  return `${(n / 1_000_000).toFixed(1).replace('.', ',')}М`;
+}

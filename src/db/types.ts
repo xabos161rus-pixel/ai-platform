@@ -15,6 +15,10 @@ export interface Chat extends BaseEntity {
   systemPrompt: string;
   lastMessageAt: string | null;
   pinned: boolean;
+  /** Папка в боковой панели. null/undefined — вне папок. Поле не индексируем: чатов сотни, фильтруем в памяти. */
+  folder?: string | null;
+  /** Имя роли-источника systemPrompt — только подпись в UI. Промпт скопирован по значению: удаление роли чат не ломает. */
+  personaName?: string | null;
 }
 
 export type Role = 'user' | 'assistant';
@@ -45,6 +49,10 @@ export interface Message extends BaseEntity {
   runIndex?: number;
   /** Победитель прогона — его ответ уходит в контекст. */
   chosen?: boolean;
+  /** Вложенные картинки: сжатые JPEG dataURL (≤1024px по длинной стороне, ≤4 шт). Только у сообщений пользователя. */
+  images?: string[];
+  /** Рассуждения модели (reasoning_content/reasoning из потока). Нет поля — модель мысли не шлёт. */
+  reasoning?: string;
 }
 
 /**
@@ -60,6 +68,13 @@ export interface Provider extends BaseEntity {
   apiKey: string;
   models: string[]; // список доступных id моделей
   isDemo: boolean; // встроенная заглушка-эхо: без сети, без ключа
+}
+
+export interface Persona extends BaseEntity {
+  name: string;
+  prompt: string;
+  /** Встроенная роль: нельзя удалить, восстанавливается при старте. */
+  builtin: boolean;
 }
 
 export interface Settings {

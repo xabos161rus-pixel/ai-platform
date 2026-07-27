@@ -4,7 +4,9 @@ import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:4174/ai-platform';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const p = await b.newPage();
+// acceptDownloads — иначе событие 'download' для экспорта снапшота не долетает.
+const ctx = await b.newContext({ acceptDownloads: true });
+const p = await ctx.newPage();
 const errors = [];
 p.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 p.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text().slice(0, 160)}`); });
@@ -108,6 +110,86 @@ check(await p.getByRole('button', { name: 'сравнить' }).isVisible(), 'к
 await p.getByRole('button', { name: 'сравнить' }).click();
 await p.waitForTimeout(500);
 check((await p.textContent('body')).includes('сравнить:'), 'панель выбора моделей раскрылась');
+
+// Общий обработчик диалогов — ставим здесь, ПОСЛЕ всех сценариев со своими
+// window.confirm выше (там подтверждений не было). Новые сценарии ниже сами
+// провоцируют confirm (переименование не спрашивает, а вот экспорт и импорт —
+// да), и без авто-accept они бы зависли на модалке браузера.
+p.on('dialog', (d) => d.accept());
+
+// Предыдущий блок оставил включённым режим сравнения (2 модели без ключа) —
+// выключаем, иначе дальнейшая «Отправить» уходит в сравнение, а не в обычный ask().
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+const compareOff = p.getByRole('button', { name: 'Выключить сравнение' });
+if (await compareOff.isVisible().catch(() => false)) {
+  await compareOff.click();
+  await p.waitForTimeout(300);
+}
+
+// Переименование чата
+await p.goto(`${BASE}/`);
+await p.waitForTimeout(600);
+await p.locator('aside .group').first().hover();
+await p.getByRole('button', { name: 'Действия с чатом' }).first().click();
+await p.waitForTimeout(300);
+await p.getByRole('button', { name: 'Переименовать' }).click();
+await p.waitForTimeout(300);
+await p.getByLabel('Новое название').fill('Переименованный');
+await p.keyboard.press('Enter');
+await p.waitForTimeout(500);
+check((await p.textContent('aside')).includes('Переименованный'), 'чат переименован из меню');
+
+// Папка: тот же чат — снова меню → «В папку…» → новое имя папки
+await p.locator('aside .group').first().hover();
+await p.getByRole('button', { name: 'Действия с чатом' }).first().click();
+await p.waitForTimeout(300);
+await p.getByRole('button', { name: 'В папку…' }).click();
+await p.waitForTimeout(300);
+await p.getByPlaceholder('Новая папка').fill('Работа');
+await p.keyboard.press('Enter');
+await p.waitForTimeout(500);
+check((await p.textContent('aside')).includes('Работа'), 'чат перенесён в новую папку');
+// Клик по заголовку папки сворачивает список — чат внутри должен пропасть из aside
+await p.getByText('Работа', { exact: false }).first().click();
+await p.waitForTimeout(400);
+check(!(await p.textContent('aside')).includes('Переименованный'), 'папка сворачивается');
+
+// Роль и системный промпт: разворачиваем папку обратно и открываем чат из неё
+await p.getByText('Работа', { exact: false }).first().click();
+await p.waitForTimeout(400);
+await p.getByText('Переименованный', { exact: false }).first().click();
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Системный промпт' }).click();
+await p.waitForTimeout(400);
+await p.getByText('Бизнес-аналитик').first().click();
+await p.waitForTimeout(300);
+await p.getByRole('button', { name: 'Сохранить', exact: true }).click();
+await p.waitForTimeout(400);
+await p.getByPlaceholder('Спросите что угодно…').fill('проверка роли');
+await p.getByRole('button', { name: 'Отправить' }).click();
+await p.waitForTimeout(2000);
+check((await p.textContent('body')).includes('системный промпт задан'), 'роль дошла до запроса');
+
+// Мысли модели: демо-ответ по умолчанию (demo-echo) шлёт синтетическое reasoning
+check((await p.textContent('body')).includes('мысли модели'), 'reasoning-блок у демо-ответа');
+
+// Экспорт снапшота
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+const dlPromise = p.waitForEvent('download');
+await p.getByRole('button', { name: 'Скачать снапшот (JSON)' }).click();
+const dl = await dlPromise;
+check(dl.suggestedFilename().startsWith('ai-platform-backup'), 'снапшот скачивается');
+const dlPath = await dl.path();
+
+// Импорт того же снапшота — bulkPut идемпотентен, дублей быть не должно
+await p.locator('input[type=file][accept*="json"]').setInputFiles(dlPath);
+await p.waitForTimeout(800);
+check((await p.textContent('body')).includes('Восстановлено'), 'импорт отчитался о восстановлении');
+
+// Разбивка расходов по моделям — демо-модель показывается «бесплатно», но попадает в список
+check((await p.textContent('body')).includes('Демо · подробный'), 'разбивка расходов по моделям');
 
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
