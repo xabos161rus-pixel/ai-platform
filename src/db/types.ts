@@ -19,6 +19,16 @@ export interface Chat extends BaseEntity {
   folder?: string | null;
   /** Имя роли-источника systemPrompt — только подпись в UI. Промпт скопирован по значению: удаление роли чат не ломает. */
   personaName?: string | null;
+  /**
+   * Активный лист дерева версий — id узла-представителя, на который сейчас
+   * смотрит чат. null — чат пуст либо явно на корне. Поле не индексируем:
+   * читается только вместе с самим чатом.
+   */
+  activeLeafId?: string | null;
+  /** Температура запроса. null/отсутствие — не передавать провайдеру (его дефолт). */
+  temperature?: number | null;
+  /** Лимит токенов ответа. null/отсутствие — не передавать провайдеру. */
+  maxTokens?: number | null;
 }
 
 export type Role = 'user' | 'assistant';
@@ -53,6 +63,12 @@ export interface Message extends BaseEntity {
   images?: string[];
   /** Рассуждения модели (reasoning_content/reasoning из потока). Нет поля — модель мысли не шлёт. */
   reasoning?: string;
+  /**
+   * Явный родитель в дереве версий. undefined — legacy-сообщение из линейной
+   * цепочки (эффективный родитель вычисляется по createdAt в tree.ts). null —
+   * корень чата. Поле не индексируем: дерево строится в памяти из выборки по chatId.
+   */
+  parentId?: string | null;
 }
 
 /**
@@ -62,11 +78,20 @@ export interface Message extends BaseEntity {
  * IndexedDB устройства: платформа BYOK, ключ пользователя никуда не уходит,
  * кроме самого провайдера.
  */
+/** Модель провайдера с опциональной ценой, ₽ за 1M токенов. */
+export interface ProviderModel {
+  id: string;
+  priceIn?: number;
+  priceOut?: number;
+}
+
 export interface Provider extends BaseEntity {
   name: string;
   baseUrl: string; // напр. https://api.polza.ai/api/v1
   apiKey: string;
-  models: string[]; // список доступных id моделей
+  // Строка — legacy-запись (модель без цены); новые записи пишутся объектами.
+  // Единственная точка нормализации — modelEntries() в lib/ai/models.ts.
+  models: (string | ProviderModel)[];
   isDemo: boolean; // встроенная заглушка-эхо: без сети, без ключа
 }
 
@@ -77,9 +102,18 @@ export interface Persona extends BaseEntity {
   builtin: boolean;
 }
 
+export interface Snippet extends BaseEntity {
+  title: string;
+  text: string;
+  /** Встроенный сниппет: нельзя удалить, восстанавливается при старте. */
+  builtin: boolean;
+}
+
 export interface Settings {
   id: 'app';
   theme: 'dark' | 'light' | 'system';
+  /** Язык интерфейса. 'system' — по navigator.language. Отсутствие поля = 'system'. */
+  language?: 'ru' | 'en' | 'system';
   activeProviderId: string | null;
   defaultModel: string;
   /** Модели для режима сравнения: `providerId:model`. Пусто — режим выключен. */

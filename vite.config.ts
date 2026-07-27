@@ -12,6 +12,36 @@ const BUILD_ID = new Date().toISOString().replace('T', ' ').slice(0, 16)
 // иначе preview отдаёт ассеты не по тому пути и страница остаётся пустой.
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/ai-platform/' : '/',
+  build: {
+    rollupOptions: {
+      output: {
+        // vendor-react: библиотеки фреймворка меняются реже кода приложения —
+        // отдельный чанк кэшируется браузером между деплоями, где правится
+        // только наш код. vendor-hljs: highlight.js и так грузится динамически
+        // (см. CodeBlock.tsx), но без явного чанка попадал бы в общий
+        // «остаток» вместе со случайными соседями по графу импортов.
+        //
+        // Функция, а не объект {chunkName: [pkg,...]}: это rolldown-vite
+        // (см. node_modules/vite — обёртка над rolldown, не над rollup),
+        // а его manualChunks принимает только ManualChunksFunction —
+        // объектная форма классического Rollup здесь не типизирована.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            // src/lib и src/db — общий код между главным экраном и ленивым
+            // экраном настроек (Dexie, chatRepo, i18n, модели): без явного
+            // имени бандлер всё равно вынес бы их в отдельный общий чанк
+            // (два входа делят модуль — дублировать код нельзя), но назвал бы
+            // его в честь случайного компонента-импортёра. Явное имя читаемо
+            // в таблице размеров README.
+            if (/[/\\]src[/\\](lib|db)[/\\]/.test(id)) return 'app-shared';
+            return;
+          }
+          if (/node_modules\/(react|react-dom|react-router|scheduler)\//.test(id)) return 'vendor-react';
+          if (id.includes('node_modules/highlight.js')) return 'vendor-hljs';
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),

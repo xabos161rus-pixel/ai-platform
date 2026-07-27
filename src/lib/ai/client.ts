@@ -10,6 +10,7 @@
 
 import type { Provider } from '../../db/types';
 import { estimateTokens } from './models';
+import { getLang, t } from '../i18n';
 
 export interface Usage {
   in: number;
@@ -72,77 +73,118 @@ export class AiError extends Error {
 
 /** Текст ошибки для человека — без кодов и стектрейсов. */
 export function errorText(e: unknown): string {
-  if (!(e instanceof AiError)) return 'Неизвестная ошибка.';
+  if (!(e instanceof AiError)) return t('error.unknown');
   switch (e.code) {
     case 'no_provider':
-      return 'Не выбран провайдер. Откройте настройки.';
+      return t('error.noProvider');
     case 'no_key':
-      return 'У провайдера не задан API-ключ.';
+      return t('error.noKey');
     case 'unauthorized':
-      return 'Ключ не принят. Проверьте его в настройках.';
+      return t('error.unauthorized');
     case 'forbidden':
-      return 'Доступ запрещён. Возможно, ключ без прав на эту модель.';
+      return t('error.forbidden');
     case 'geo_blocked':
-      return 'Провайдер отклонил запрос по региону. Нужен агрегатор с российским доступом.';
+      return t('error.geoBlocked');
     case 'rate_limit':
-      return 'Слишком часто или закончились средства на счёте провайдера.';
+      return t('error.rateLimit');
     case 'aborted':
-      return 'Остановлено.';
+      return t('error.aborted');
     case 'network':
-      return 'Нет связи с провайдером. Проверьте адрес API и интернет.';
+      return t('error.network');
     default:
       return e.message;
   }
 }
 
-/** Ответ демо-провайдера: платформа работает сразу после установки. */
+/**
+ * Ответ демо-провайдера: платформа работает сразу после установки.
+ * Контент строится по текущему языку интерфейса (getLang()) в момент
+ * генерации — это код, а не запись БД, поэтому перегенерируется свободно.
+ */
 function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-echo'): Reply {
   const last = messages[messages.length - 1];
   const imgs = last.images?.length ?? 0;
+  const ru = getLang() === 'ru';
   if (model === 'demo-fast') {
-    const lines = [
-      '**Демо · краткий.** Вторая модель отвечает иначе — так видно смысл сравнения.',
-      '',
-      `Вопрос: «${last.content.slice(0, 120)}»`,
-      '',
-      `Сообщений в контексте: ${messages.length}`,
-    ];
-    if (imgs > 0) lines.push('', `Изображений: ${imgs}`);
+    const lines = ru
+      ? [
+          '**Демо · краткий.** Вторая модель отвечает иначе — так видно смысл сравнения.',
+          '',
+          `Вопрос: «${last.content.slice(0, 120)}»`,
+          '',
+          `Сообщений в контексте: ${messages.length}`,
+        ]
+      : [
+          "**Demo · brief.** The second model answers differently — that's the point of comparison.",
+          '',
+          `Question: "${last.content.slice(0, 120)}"`,
+          '',
+          `Messages in context: ${messages.length}`,
+        ];
+    if (imgs > 0) lines.push('', ru ? `Изображений: ${imgs}` : `Images: ${imgs}`);
     const short = lines.join('\n');
     // demo-fast намеренно не шлёт reasoning — живой пример модели без мыслей.
     return { content: short, model, usage: { in: estimateTokens(last.content), out: estimateTokens(short) } };
   }
-  const lines = [
-    '**Демо-режим.** Провайдер не подключён — отвечает встроенная заглушка.',
-    '',
-    'Ваш вопрос:',
-    '',
-    `> ${last.content.slice(0, 500).replace(/\n/g, '\n> ')}`,
-    '',
-    `Сообщений в контексте: ${messages.length}${systemPrompt ? ' · системный промпт задан' : ''}`,
-  ];
-  if (imgs > 0) lines.push('', `Вижу изображений: ${imgs}.`);
+  const lines = ru
+    ? [
+        '**Демо-режим.** Провайдер не подключён — отвечает встроенная заглушка.',
+        '',
+        'Ваш вопрос:',
+        '',
+        `> ${last.content.slice(0, 500).replace(/\n/g, '\n> ')}`,
+        '',
+        `Сообщений в контексте: ${messages.length}${systemPrompt ? ' · системный промпт задан' : ''}`,
+      ]
+    : [
+        '**Demo mode.** No provider connected — a built-in stub is answering.',
+        '',
+        'Your question:',
+        '',
+        `> ${last.content.slice(0, 500).replace(/\n/g, '\n> ')}`,
+        '',
+        `Messages in context: ${messages.length}${systemPrompt ? ' · system prompt set' : ''}`,
+      ];
+  if (imgs > 0) lines.push('', ru ? `Вижу изображений: ${imgs}.` : `I see images: ${imgs}.`);
   lines.push(
     '',
-    'Чтобы получать настоящие ответы, добавьте провайдера в настройках:',
+    ru
+      ? 'Чтобы получать настоящие ответы, добавьте провайдера в настройках:'
+      : 'To get real answers, add a provider in settings:',
     '',
-    '| Поле | Пример |',
+    ru ? '| Поле | Пример |' : '| Field | Example |',
     '|---|---|',
-    '| Адрес API | `https://api.polza.ai/api/v1` |',
-    '| Ключ | `sk-...` |',
+    ru ? '| Адрес API | `https://api.polza.ai/api/v1` |' : '| API address | `https://api.polza.ai/api/v1` |',
+    ru ? '| Ключ | `sk-...` |' : '| Key | `sk-...` |',
     '',
     '```js',
-    '// проверка блока кода',
+    ru ? '// проверка блока кода' : '// code block check',
     'const ok = true;',
     '```',
   );
+  // Триггер существует для проверяемости предпросмотра артефактов в smoke:
+  // без живого провайдера это единственный детерминированный способ получить
+  // html-блок кода с рабочей кнопкой «Предпросмотр». Слово-триггер 'html'
+  // не переводим — это литерал во входном тексте пользователя, а не UI-строка.
+  if (/html/i.test(last.content)) {
+    lines.push(
+      '',
+      '```html',
+      ru
+        ? '<!doctype html><html><body style="font-family:sans-serif"><h3>Демо-артефакт</h3><button onclick="this.textContent=\'Работает!\'">Нажми меня</button></body></html>'
+        : '<!doctype html><html><body style="font-family:sans-serif"><h3>Demo artifact</h3><button onclick="this.textContent=\'Works!\'">Click me</button></body></html>',
+      '```',
+    );
+  }
   const content = lines.join('\n');
   const inChars = messages.reduce((n, m) => n + m.content.length, 0) + systemPrompt.length;
   return {
     content,
     model,
     usage: { in: estimateTokens(String(inChars)), out: estimateTokens(content) },
-    reasoning: `Разбираю вопрос: «${last.content.slice(0, 80)}». Это демо — показываю, как выглядят мысли модели до ответа.`,
+    reasoning: ru
+      ? `Разбираю вопрос: «${last.content.slice(0, 80)}». Это демо — показываю, как выглядят мысли модели до ответа.`
+      : `Parsing the question: "${last.content.slice(0, 80)}". This is a demo — showing what a model's thoughts look like before the answer.`,
   };
 }
 
@@ -177,7 +219,7 @@ async function readSse(
   onReasoning?: OnDelta,
 ): Promise<{ text: string; reasoning: string; model: string; usage: Usage }> {
   const reader = res.body?.getReader();
-  if (!reader) throw new AiError('provider', 'ответ без тела');
+  if (!reader) throw new AiError('provider', t('error.noBody'));
   const decoder = new TextDecoder();
   let buffer = '';
   let text = '';
@@ -260,14 +302,14 @@ async function streamDemo(
   if (full.reasoning && onReasoning) {
     const thinkParts = full.reasoning.match(/\S+\s*/g) ?? [full.reasoning];
     for (const part of thinkParts) {
-      if (signal?.aborted) throw new AiError('aborted', 'остановлено');
+      if (signal?.aborted) throw new AiError('aborted', t('error.abortedInternal'));
       await new Promise((r) => setTimeout(r, 8));
       onReasoning(part);
     }
   }
   const parts = full.content.match(/\S+\s*/g) ?? [full.content];
   for (const part of parts) {
-    if (signal?.aborted) throw new AiError('aborted', 'остановлено');
+    if (signal?.aborted) throw new AiError('aborted', t('error.abortedInternal'));
     await new Promise((r) => setTimeout(r, 12));
     onDelta(part);
   }
@@ -288,11 +330,14 @@ export async function streamChat(params: {
   onDelta: OnDelta;
   onReasoning?: OnDelta;
   signal?: AbortSignal;
+  temperature?: number;
+  maxTokens?: number;
 }): Promise<Reply> {
-  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal } = params;
-  if (!provider) throw new AiError('no_provider', 'провайдер не выбран');
+  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens } = params;
+  if (!provider) throw new AiError('no_provider', t('error.noProviderInternal'));
+  // Демо-путь параметры игнорирует — заглушка не читает temperature/maxTokens.
   if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal, onReasoning);
-  if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
+  if (!provider.apiKey) throw new AiError('no_key', t('error.noKeyInternal'));
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const wireMessages = toWire(messages);
@@ -309,23 +354,25 @@ export async function streamChat(params: {
         // не умеют, поле просто игнорируют — тогда счётчик останется нулевым,
         // и лучше показать ноль, чем выдуманную оценку.
         stream_options: { include_usage: true },
+        ...(typeof temperature === 'number' && { temperature }),
+        ...(typeof maxTokens === 'number' && { max_tokens: maxTokens }),
       }),
       signal,
     });
   } catch (e) {
-    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', 'остановлено');
-    throw new AiError('network', 'нет связи');
+    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', t('error.abortedInternal'));
+    throw new AiError('network', t('error.noConnectionInternal'));
   }
   if (!res.ok) throw await toAiError(res);
 
   try {
     const { text, reasoning, model: gotModel, usage } = await readSse(res, onDelta, onReasoning);
-    if (!text.trim()) throw new AiError('provider', 'провайдер вернул пустой ответ');
+    if (!text.trim()) throw new AiError('provider', t('error.emptyReply'));
     return { content: text, model: gotModel || model, usage, reasoning: reasoning.trim() ? reasoning : undefined };
   } catch (e) {
     if (e instanceof AiError) throw e;
-    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', 'остановлено');
-    throw new AiError('network', 'поток оборван');
+    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', t('error.abortedInternal'));
+    throw new AiError('network', t('error.streamBroken'));
   }
 }
 
@@ -336,15 +383,17 @@ export async function requestChat(params: {
   systemPrompt: string;
   model: string;
   signal?: AbortSignal;
+  temperature?: number;
+  maxTokens?: number;
 }): Promise<Reply> {
-  const { provider, messages, systemPrompt, model, signal } = params;
-  if (!provider) throw new AiError('no_provider', 'провайдер не выбран');
+  const { provider, messages, systemPrompt, model, signal, temperature, maxTokens } = params;
+  if (!provider) throw new AiError('no_provider', t('error.noProviderInternal'));
   if (provider.isDemo) {
     await new Promise((r) => setTimeout(r, 400));
-    if (signal?.aborted) throw new AiError('aborted', 'остановлено');
+    if (signal?.aborted) throw new AiError('aborted', t('error.abortedInternal'));
     return demoReply(messages, systemPrompt, model);
   }
-  if (!provider.apiKey) throw new AiError('no_key', 'не задан ключ');
+  if (!provider.apiKey) throw new AiError('no_key', t('error.noKeyInternal'));
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const wireMessages = toWire(messages);
@@ -356,18 +405,20 @@ export async function requestChat(params: {
       body: JSON.stringify({
         model,
         messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...wireMessages] : wireMessages,
+        ...(typeof temperature === 'number' && { temperature }),
+        ...(typeof maxTokens === 'number' && { max_tokens: maxTokens }),
       }),
       signal,
     });
   } catch (e) {
-    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', 'остановлено');
-    throw new AiError('network', 'нет связи');
+    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', t('error.abortedInternal'));
+    throw new AiError('network', t('error.noConnectionInternal'));
   }
   if (!res.ok) throw await toAiError(res);
 
   const data = (await res.json()) as OpenAiResponse;
   const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== 'string') throw new AiError('provider', 'пустой ответ провайдера');
+  if (typeof content !== 'string') throw new AiError('provider', t('error.emptyReply'));
   const think = data.choices?.[0]?.message?.reasoning_content ?? data.choices?.[0]?.message?.reasoning;
   return {
     content,

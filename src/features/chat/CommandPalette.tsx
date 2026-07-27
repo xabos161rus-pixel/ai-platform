@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Columns2, CornerDownLeft, MessageSquare, MessageSquarePlus, Moon, Search, Settings, Sun } from 'lucide-react';
+import { Columns2, CornerDownLeft, Keyboard, MessageSquare, MessageSquarePlus, Moon, Search, Settings, Sun } from 'lucide-react';
 import type { Chat, Provider } from '../../db/types';
-import { modelLabel } from '../../lib/ai/models';
+import { modelIds, modelLabel } from '../../lib/ai/models';
+import { searchAll, type SearchHit } from '../../lib/search';
+import { useT } from '../../lib/i18n';
 
 export interface Command {
   id: string;
@@ -23,6 +25,7 @@ interface Props {
   onToggleTheme: () => void;
   onToggleCompare: () => void;
   onOpenSettings: () => void;
+  onOpenShortcuts: () => void;
 }
 
 /**
@@ -50,42 +53,87 @@ function Palette({
   onToggleTheme,
   onToggleCompare,
   onOpenSettings,
+  onOpenShortcuts,
 }: Props) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
+  const [chatHits, setChatHits] = useState<SearchHit[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Поиск по содержимому чатов — debounce 200мс, только при запросе от двух
+  // символов; setState исключительно в колбэке таймера. Короче двух символов —
+  // показываем обычные последние чаты (см. chatCommands ниже), без похода в БД.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const q = query.trim();
+      if (q.length < 2) {
+        setChatHits([]);
+        return;
+      }
+      void searchAll(q).then(setChatHits);
+    }, 200);
+    return () => clearTimeout(id);
+  }, [query]);
 
   const commands = useMemo<Command[]>(() => {
     const base: Command[] = [
-      { id: 'new', label: 'Новый чат', hint: '⌘N', icon: MessageSquarePlus, run: onNewChat },
-      { id: 'compare', label: 'Режим сравнения моделей', icon: Columns2, run: onToggleCompare },
-      { id: 'theme', label: 'Переключить тему', icon: Moon, run: onToggleTheme },
-      { id: 'settings', label: 'Настройки', icon: Settings, run: onOpenSettings },
+      { id: 'new', label: t('chat.newChat'), hint: '⌘N', icon: MessageSquarePlus, run: onNewChat },
+      { id: 'compare', label: t('palette.compareMode'), icon: Columns2, run: onToggleCompare },
+      { id: 'theme', label: t('palette.toggleTheme'), icon: Moon, run: onToggleTheme },
+      { id: 'settings', label: t('nav.settings'), icon: Settings, run: onOpenSettings },
+      { id: 'shortcuts', label: t('shortcuts.title'), icon: Keyboard, run: onOpenShortcuts },
     ];
     const models: Command[] = providers.flatMap((p) =>
-      p.models.map((m) => ({
+      modelIds(p.models).map((m) => ({
         id: `model:${p.id}:${m}`,
-        label: `Модель: ${modelLabel(m)}`,
+        label: t('palette.modelPrefix', { name: modelLabel(m) }),
         hint: p.name,
         icon: Sun,
         run: () => onPickModel(p.id, m),
       })),
     );
-    const recent: Command[] = chats.slice(0, 12).map((c) => ({
-      id: `chat:${c.id}`,
-      label: c.title,
-      hint: 'чат',
-      icon: MessageSquare,
-      run: () => onPickChat(c.id),
-    }));
-    return [...base, ...models, ...recent];
-  }, [chats, providers, onNewChat, onPickChat, onPickModel, onToggleTheme, onToggleCompare, onOpenSettings]);
+    return [...base, ...models];
+  }, [providers, onNewChat, onPickModel, onToggleTheme, onToggleCompare, onOpenSettings, onOpenShortcuts, t]);
 
-  const filtered = useMemo(() => {
+  const filteredCommands = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // «?» — классический вызов справки по клавишам: поднимаем её первой
+    // строкой вместо обычной подстрочной фильтрации (иначе "?" ничего не
+    // находит — символа нет ни в одной подписи команды).
+    if (q === '?') {
+      const shortcuts = commands.find((c) => c.id === 'shortcuts');
+      if (!shortcuts) return commands;
+      return [shortcuts, ...commands.filter((c) => c.id !== 'shortcuts')];
+    }
     if (!q) return commands;
     return commands.filter((c) => `${c.label} ${c.hint ?? ''}`.toLowerCase().includes(q));
   }, [commands, query]);
+
+  // Чат-хиты идут ПОСЛЕ команд: короткий/пустой запрос — последние чаты без
+  // фильтра (как раньше), запрос от двух символов — результаты searchAll по
+  // содержимому (заголовок + текст сообщений), см. эффект выше.
+  const chatCommands = useMemo<Command[]>(() => {
+    const q = query.trim();
+    if (q.length >= 2) {
+      return chatHits.map((h) => ({
+        id: `chat:${h.chat.id}`,
+        label: h.chat.title || t('chat.newChat'),
+        hint: h.fragment ?? t('palette.chat'),
+        icon: MessageSquare,
+        run: () => onPickChat(h.chat.id),
+      }));
+    }
+    return chats.slice(0, 12).map((c) => ({
+      id: `chat:${c.id}`,
+      label: c.title || t('chat.newChat'),
+      hint: t('palette.chat'),
+      icon: MessageSquare,
+      run: () => onPickChat(c.id),
+    }));
+  }, [chats, chatHits, query, onPickChat, t]);
+
+  const filtered = useMemo(() => [...filteredCommands, ...chatCommands], [filteredCommands, chatCommands]);
 
   // Держим подсвеченный пункт в видимой части списка при навигации с клавиш.
   useEffect(() => {
@@ -96,7 +144,7 @@ function Palette({
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[12vh]">
-      <button aria-label="Закрыть" className="animate-fade-in absolute inset-0 bg-black/50" onClick={onClose} />
+      <button aria-label={t('common.close')} className="animate-fade-in absolute inset-0 bg-black/50" onClick={onClose} />
       <div
         role="dialog"
         className="animate-fade-in relative w-[92vw] max-w-lg overflow-hidden rounded-[var(--cc-radius)] border border-hairline bg-elevated shadow-[var(--shadow-pop)]"
@@ -106,7 +154,7 @@ function Palette({
           <input
             autoFocus
             value={query}
-            placeholder="Команда, чат или модель…"
+            placeholder={t('palette.placeholder')}
             onChange={(e) => {
               setQuery(e.target.value);
               setCursor(0);
@@ -129,8 +177,8 @@ function Palette({
             className="min-w-0 flex-1 bg-transparent py-3 outline-none placeholder:text-muted"
           />
         </div>
-        <div ref={listRef} className="max-h-[50vh] overflow-y-auto p-1.5">
-          {!filtered.length && <p className="px-3 py-6 text-center text-sm text-muted">Ничего не найдено</p>}
+        <div ref={listRef} className="cc-scroll max-h-[50vh] overflow-y-auto p-1.5">
+          {!filtered.length && <p className="px-3 py-6 text-center text-sm text-muted">{t('common.notFound')}</p>}
           {filtered.map((c, i) => {
             const Icon = c.icon;
             return (

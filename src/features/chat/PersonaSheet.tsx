@@ -7,6 +7,7 @@ import { useToast } from '../../components/ui/toastContext';
 import type { Chat, Persona } from '../../db/types';
 import { createPersona, listPersonas, removePersona } from '../../lib/ai/personaRepo';
 import { patchChat } from '../../lib/ai/chatRepo';
+import { useT } from '../../lib/i18n';
 
 interface Props {
   open: boolean;
@@ -20,25 +21,28 @@ interface Props {
  * перемонтирование вместо синхронного setState в эффекте.
  */
 export function PersonaSheet({ open, chat, onClose }: Props) {
+  const t = useT();
   const toast = useToast();
   const [text, setText] = useState(chat?.systemPrompt ?? '');
   const [roleName, setRoleName] = useState<string | null>(chat?.personaName ?? null);
+  const [temperature, setTemperature] = useState<number | null>(chat?.temperature ?? null);
+  const [maxTokens, setMaxTokens] = useState<number | null>(chat?.maxTokens ?? null);
   const personas = useLiveQuery(() => listPersonas(), [], [] as Persona[]);
 
   if (!open || !chat) return null;
 
   async function handleDelete(p: Persona) {
-    if (!window.confirm(`Удалить роль «${p.name}»?`)) return;
+    if (!window.confirm(t('persona.deleteRoleConfirm', { name: p.name }))) return;
     await removePersona(p.id);
     // Если удаляемая роль была выбрана — text/roleName не трогаем: промпт уже
     // скопирован по значению в состояние формы, ссылка на роль ему не нужна.
   }
 
   async function handleSaveAsPersona() {
-    const name = window.prompt('Название роли');
+    const name = window.prompt(t('persona.namePrompt'));
     if (!name?.trim()) return;
     await createPersona(name, text);
-    toast('Роль сохранена');
+    toast(t('persona.roleSaved'));
     setRoleName(name.trim());
   }
 
@@ -46,31 +50,32 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
     await patchChat(chat.id, {
       systemPrompt: text.trim(),
       personaName: text.trim() ? roleName : null,
+      // null пишем явно (не пропускаем поле) — «не задано» отличимо от «не менялось»,
+      // и запрос корректно перестаёт слать параметр после сброса.
+      temperature,
+      maxTokens,
     });
-    toast('Промпт обновлён');
+    toast(t('persona.promptUpdated'));
     onClose();
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Системный промпт">
+    <Sheet open={open} onClose={onClose} title={t('persona.title')}>
       <div className="space-y-4">
-        <p className="text-muted text-[var(--cc-text-meta)] leading-relaxed">
-          Промпт задаёт модели роль и правила на весь чат. Выберите готовую роль или напишите свой — он уходит первым
-          сообщением в каждый запрос.
-        </p>
+        <p className="text-muted text-[var(--cc-text-meta)] leading-relaxed">{t('persona.description')}</p>
 
         {/* border-accent/50, не /40: на светлой теме элевейтед-фон белый, и более
             бледная граница у чипа сливалась с ним по краям скругления. */}
         {roleName && (
           <span className="border-accent/50 text-accent inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[var(--cc-text-caption)]">
-            Роль: {roleName}
+            {t('persona.roleChip', { name: roleName })}
           </span>
         )}
 
         <textarea
           rows={5}
           value={text}
-          placeholder="Например: отвечай кратко, по-русски, с примерами…"
+          placeholder={t('persona.placeholder')}
           className="w-full resize-none rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-base outline-none transition-shadow placeholder:text-muted focus:shadow-[0_0_0_1px_var(--app-accent)]"
           onChange={(e) => {
             setText(e.target.value);
@@ -80,7 +85,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
         />
 
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Роли</h3>
+          <h3 className="mb-2 text-sm font-semibold">{t('persona.rolesHeading')}</h3>
           <div className="space-y-1.5">
             {personas.map((p) => (
               <div
@@ -100,9 +105,9 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
                   <span className="block truncate text-[var(--cc-text-caption)] text-muted">{p.prompt}</span>
                 </button>
                 {p.builtin ? (
-                  <span className="shrink-0 font-mono text-[var(--cc-text-caption)] text-muted">встроенная</span>
+                  <span className="shrink-0 font-mono text-[var(--cc-text-caption)] text-muted">{t('persona.builtin')}</span>
                 ) : (
-                  <button aria-label="Удалить роль" className="shrink-0 p-1 active:opacity-60" onClick={() => void handleDelete(p)}>
+                  <button aria-label={t('persona.deleteRoleAria')} className="shrink-0 p-1 active:opacity-60" onClick={() => void handleDelete(p)}>
                     <Trash2 size={15} />
                   </button>
                 )}
@@ -111,9 +116,65 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
           </div>
         </div>
 
+        <div className="space-y-3 border-t border-hairline pt-4">
+          <h3 className="text-sm font-semibold">{t('params.title')}</h3>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{t('params.temperature')}</span>
+              <div className="flex items-center gap-2">
+                <span className={`font-mono text-[var(--cc-text-caption)] ${temperature === null ? 'text-muted' : ''}`}>
+                  {temperature === null ? t('params.default') : temperature.toFixed(1)}
+                </span>
+                <button
+                  className="p-1 text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
+                  disabled={temperature === null}
+                  onClick={() => setTemperature(null)}
+                >
+                  {t('params.reset')}
+                </button>
+              </div>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={0.1}
+              value={temperature ?? 1}
+              onChange={(e) => setTemperature(Number(e.target.value))}
+              className={`w-full accent-[var(--app-accent)] ${temperature === null ? 'opacity-40' : ''}`}
+            />
+          </div>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">{t('params.maxTokens')}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={maxTokens ?? ''}
+              placeholder="—"
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                if (raw === '') {
+                  setMaxTokens(null);
+                  return;
+                }
+                const n = Number(raw);
+                if (Number.isFinite(n)) setMaxTokens(Math.max(1, Math.floor(n)));
+              }}
+              className="w-full rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-base outline-none placeholder:text-muted focus:shadow-[0_0_0_1px_var(--app-accent)]"
+            />
+            <span className="mt-1 block text-[var(--cc-text-caption)] leading-relaxed text-muted">
+              {t('params.maxTokensHint')}
+            </span>
+          </label>
+        </div>
+
         {text.trim() && (
           <Button variant="ghost" className="w-full" onClick={() => void handleSaveAsPersona()}>
-            Сохранить как роль
+            {t('persona.saveAsRole')}
           </Button>
         )}
 
@@ -126,10 +187,10 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
               setRoleName(null);
             }}
           >
-            Очистить
+            {t('persona.clear')}
           </Button>
           <Button className="flex-1" onClick={() => void handleSave()}>
-            Сохранить
+            {t('common.save')}
           </Button>
         </div>
       </div>

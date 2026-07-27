@@ -1,27 +1,36 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
-import { ChevronLeft, Download, KeyRound, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, Download, KeyRound, Keyboard, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { db, DEMO_PROVIDER_ID } from '../../db/db';
-import type { Provider } from '../../db/types';
+import type { Provider, Snippet } from '../../db/types';
 import { now, stamp } from '../../lib/repo';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../components/ui/toastContext';
 import { monthSpendByModel, monthSpendRub, type ModelSpend } from '../../lib/ai/chatRepo';
-import { formatCost, formatTokens, modelLabel } from '../../lib/ai/models';
+import { formatCost, formatTokens, modelIds, modelLabel } from '../../lib/ai/models';
+import { addSnippet, listSnippets, patchSnippet, removeSnippet } from '../../lib/ai/snippetRepo';
 import { exportAll, parseBackup, importAll, type BackupFile } from '../../lib/backup';
 import { ProviderSheet } from './ProviderSheet';
+import { SnippetSheet } from './SnippetSheet';
+import { ShortcutsSheet } from '../chat/ShortcutsSheet';
+import { useT } from '../../lib/i18n';
 
 const BUILD_ID = document.querySelector('meta[name="build-id"]')?.getAttribute('content') ?? 'dev';
 
 export function SettingsPage() {
   const toast = useToast();
+  const t = useT();
   const [editing, setEditing] = useState<Provider | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
+  const [addingSnippet, setAddingSnippet] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   const settings = useLiveQuery(() => db.settings.get('app'), []);
   const providers = useLiveQuery(async () => db.providers.toArray(), [], [] as Provider[]);
+  const snippets = useLiveQuery(() => listSnippets(), [], [] as Snippet[]);
   const spend = useLiveQuery(() => monthSpendRub(), [], 0);
   const byModel = useLiveQuery(() => monthSpendByModel(), [], [] as ModelSpend[]);
 
@@ -35,25 +44,39 @@ export function SettingsPage() {
     } else {
       const row = stamp<Provider>(p);
       await db.providers.add(row);
-      await patchSettings({ activeProviderId: row.id, defaultModel: row.models[0] ?? 'demo-echo' });
+      await patchSettings({ activeProviderId: row.id, defaultModel: modelIds(row.models)[0] ?? 'demo-echo' });
     }
     setEditing(null);
     setAdding(false);
-    toast('Провайдер сохранён');
+    toast(t('settings.providerSaved'));
+  }
+
+  async function handleSaveSnippet(s: Pick<Snippet, 'title' | 'text'>, id?: string) {
+    if (id) await patchSnippet(id, s);
+    else await addSnippet(s.title, s.text);
+    setEditingSnippet(null);
+    setAddingSnippet(false);
+    toast(t('settings.snippetSaved'));
+  }
+
+  async function handleRemoveSnippet(s: Snippet) {
+    if (!window.confirm(t('settings.deleteSnippetConfirm', { title: s.title }))) return;
+    await removeSnippet(s.id);
+    toast(t('settings.snippetDeleted'));
   }
 
   async function handleRemoveProvider(p: Provider) {
     if (p.id === DEMO_PROVIDER_ID) return;
-    if (!window.confirm(`Удалить провайдера «${p.name}»? Ключ будет стёрт с устройства.`)) return;
+    if (!window.confirm(t('settings.deleteProviderConfirm', { name: p.name }))) return;
     await db.providers.delete(p.id);
     if (settings?.activeProviderId === p.id) await patchSettings({ activeProviderId: DEMO_PROVIDER_ID });
-    toast('Провайдер удалён');
+    toast(t('settings.providerDeleted'));
   }
 
   async function handleExport() {
     // Ключи провайдеров лежат в снапшоте открытым текстом — предупреждаем
     // до скачивания, чтобы файл не разошёлся куда попало.
-    if (!window.confirm('В файле будут API-ключи провайдеров — храните его в надёжном месте. Продолжить?')) return;
+    if (!window.confirm(t('settings.exportConfirm'))) return;
     const data = await exportAll();
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
@@ -61,7 +84,7 @@ export function SettingsPage() {
     a.download = `ai-platform-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast('Снапшот скачан');
+    toast(t('settings.snapshotDownloaded'));
   }
 
   async function handleImport(file: File) {
@@ -70,18 +93,18 @@ export function SettingsPage() {
       backup = parseBackup(JSON.parse(await file.text()));
     } catch {
       // Битый JSON и чужой формат — один и тот же честный тост, без деталей парсера.
-      toast('Файл не похож на снапшот AI Platform');
+      toast(t('settings.badBackup'));
       return;
     }
     if (
       !window.confirm(
-        `Восстановить данные из снапшота? Чатов: ${backup.chats.length}, сообщений: ${backup.messages.length}. Записи с совпадающими id будут перезаписаны.`,
+        t('settings.importConfirm', { chats: backup.chats.length, messages: backup.messages.length }),
       )
     )
       return;
     const rep = await importAll(backup);
     // Интерфейс обновится сам через useLiveQuery — руками ничего перечитывать не нужно.
-    toast(`Восстановлено: ${rep.chats} чатов, ${rep.messages} сообщений`);
+    toast(t('settings.restored', { chats: rep.chats, messages: rep.messages }));
   }
 
   if (!settings) return null;
@@ -91,16 +114,16 @@ export function SettingsPage() {
       <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-2 pt-[calc(env(safe-area-inset-top)+8px)] pb-2">
         <Link
           to="/"
-          aria-label="Назад"
+          aria-label={t('settings.backAria')}
           className="grid size-[var(--cc-touch)] place-items-center rounded-[var(--cc-radius)] text-accent active:opacity-60"
         >
           <ChevronLeft size={22} />
         </Link>
-        <h1 className="flex-1 text-[0.95rem] font-semibold">Настройки</h1>
+        <h1 className="flex-1 text-[0.95rem] font-semibold">{t('nav.settings')}</h1>
       </header>
 
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-6 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">
-        <Section title="Провайдеры" hint="Ключи хранятся только на этом устройстве и уходят напрямую провайдеру.">
+      <div className="cc-scroll mx-auto w-full max-w-3xl flex-1 space-y-6 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">
+        <Section title={t('settings.providers')} hint={t('settings.providersHint')}>
           <div className="space-y-1.5">
             {providers.map((p) => (
               <div
@@ -111,24 +134,24 @@ export function SettingsPage() {
               >
                 <button
                   className="min-w-0 flex-1 text-left active:opacity-60"
-                  onClick={() => void patchSettings({ activeProviderId: p.id, defaultModel: p.models[0] ?? 'demo-echo' })}
+                  onClick={() => void patchSettings({ activeProviderId: p.id, defaultModel: modelIds(p.models)[0] ?? 'demo-echo' })}
                 >
                   <span className="block truncate font-medium">{p.name}</span>
                   <span className="block truncate font-mono text-[var(--cc-text-caption)] text-muted">
-                    {p.isDemo ? 'встроенная заглушка' : p.baseUrl || 'адрес не задан'}
+                    {p.isDemo ? t('settings.demoProviderNote') : p.baseUrl || t('settings.noAddress')}
                   </span>
                 </button>
                 {!p.isDemo && (
                   <>
                     <button
-                      aria-label="Изменить"
+                      aria-label={t('settings.editAria')}
                       className="grid size-9 place-items-center text-muted active:opacity-60"
                       onClick={() => setEditing(p)}
                     >
                       <KeyRound size={16} />
                     </button>
                     <button
-                      aria-label="Удалить"
+                      aria-label={t('settings.deleteAria')}
                       className="grid size-9 place-items-center text-muted active:opacity-60"
                       onClick={() => void handleRemoveProvider(p)}
                     >
@@ -145,33 +168,47 @@ export function SettingsPage() {
             onClick={() => setAdding(true)}
           >
             <Plus size={18} />
-            Добавить провайдера
+            {t('settings.addProvider')}
           </Button>
         </Section>
 
-        <Section title="Оформление">
+        <Section title={t('settings.appearance')}>
           <div className="flex rounded-[var(--cc-radius)] bg-surface-2 p-1">
-            {(['dark', 'light', 'system'] as const).map((t) => (
+            {(['dark', 'light', 'system'] as const).map((theme) => (
               <button
-                key={t}
-                aria-pressed={settings.theme === t}
-                onClick={() => void patchSettings({ theme: t })}
+                key={theme}
+                aria-pressed={settings.theme === theme}
+                onClick={() => void patchSettings({ theme })}
                 className={`flex-1 rounded-[var(--cc-radius-sm)] py-2 text-sm font-medium transition-all ${
-                  settings.theme === t ? 'bg-accent text-white' : 'text-muted'
+                  settings.theme === theme ? 'bg-accent text-white' : 'text-muted'
                 }`}
               >
-                {t === 'dark' ? 'Тёмная' : t === 'light' ? 'Светлая' : 'Системная'}
+                {theme === 'dark' ? t('settings.theme.dark') : theme === 'light' ? t('settings.theme.light') : t('settings.system')}
               </button>
             ))}
           </div>
         </Section>
 
-        <Section
-          title="Контекст и расходы"
-          hint="Сколько последних сообщений уходит в модель. Меньше контекста — дешевле запрос: без ограничения длинный диалог оплачивается целиком каждый раз."
-        >
+        <Section title={t('settings.language')}>
+          <div className="flex rounded-[var(--cc-radius)] bg-surface-2 p-1">
+            {(['ru', 'en', 'system'] as const).map((lang) => (
+              <button
+                key={lang}
+                aria-pressed={(settings.language ?? 'system') === lang}
+                onClick={() => void patchSettings({ language: lang })}
+                className={`flex-1 rounded-[var(--cc-radius-sm)] py-2 text-sm font-medium transition-all ${
+                  (settings.language ?? 'system') === lang ? 'bg-accent text-white' : 'text-muted'
+                }`}
+              >
+                {lang === 'ru' ? 'Русский' : lang === 'en' ? 'English' : t('settings.system')}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        <Section title={t('settings.context')} hint={t('settings.contextHint')}>
           <label className="flex items-center gap-3 py-1">
-            <span className="flex-1">Сообщений в контексте</span>
+            <span className="flex-1">{t('settings.messagesInContext')}</span>
             <input
               type="number"
               min={2}
@@ -182,7 +219,7 @@ export function SettingsPage() {
             />
           </label>
           <p className="mt-2 flex items-center justify-between border-t border-hairline pt-3 text-sm">
-            <span className="text-muted">Потрачено за месяц</span>
+            <span className="text-muted">{t('settings.spentThisMonth')}</span>
             <span className="font-mono">{spend > 0 ? formatCost(spend) : '0 ₽'}</span>
           </p>
           {byModel.length > 0 &&
@@ -205,7 +242,7 @@ export function SettingsPage() {
                       const rub = rest.reduce((s, r) => s + r.rub, 0);
                       return (
                         <p className="flex items-baseline justify-between gap-3 text-[var(--cc-text-meta)]">
-                          <span className="min-w-0 truncate text-muted">прочее</span>
+                          <span className="min-w-0 truncate text-muted">{t('settings.other')}</span>
                           <span className="shrink-0 font-mono">
                             {formatTokens(tokens)} · {rub > 0 ? formatCost(rub) : '0 ₽'}
                           </span>
@@ -217,17 +254,51 @@ export function SettingsPage() {
             })()}
         </Section>
 
-        <Section
-          title="Данные"
-          hint="Снапшот включает чаты, сообщения, роли, настройки и провайдеров — вместе с API-ключами."
-        >
+        <Section title={t('snippets.title')} hint={t('snippets.hint')}>
+          <div className="space-y-1.5">
+            {snippets.map((s) => (
+              <div key={s.id} className="flex items-center gap-2 rounded-[var(--cc-radius)] border border-hairline px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{s.title}</span>
+                  <span className="block truncate text-[var(--cc-text-caption)] text-muted">{s.text}</span>
+                </div>
+                <button
+                  aria-label={t('settings.editAria')}
+                  className="grid size-9 place-items-center text-muted active:opacity-60"
+                  onClick={() => setEditingSnippet(s)}
+                >
+                  <Pencil size={16} />
+                </button>
+                {!s.builtin && (
+                  <button
+                    aria-label={t('settings.deleteAria')}
+                    className="grid size-9 place-items-center text-muted active:opacity-60"
+                    onClick={() => void handleRemoveSnippet(s)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <Button
+            variant="secondary"
+            className="mt-2 inline-flex w-full items-center justify-center gap-2"
+            onClick={() => setAddingSnippet(true)}
+          >
+            <Plus size={18} />
+            {t('snippets.add')}
+          </Button>
+        </Section>
+
+        <Section title={t('settings.data')} hint={t('settings.dataHint')}>
           <Button
             variant="secondary"
             className="inline-flex w-full items-center justify-center gap-2"
             onClick={() => void handleExport()}
           >
             <Download size={18} />
-            Скачать снапшот (JSON)
+            {t('settings.downloadSnapshot')}
           </Button>
           <Button
             variant="secondary"
@@ -235,7 +306,7 @@ export function SettingsPage() {
             onClick={() => importRef.current?.click()}
           >
             <Upload size={18} />
-            Импортировать снапшот
+            {t('settings.importSnapshot')}
           </Button>
           <input
             ref={importRef}
@@ -250,8 +321,19 @@ export function SettingsPage() {
           />
         </Section>
 
+        <Section title={t('shortcuts.title')}>
+          <Button
+            variant="secondary"
+            className="inline-flex w-full items-center justify-center gap-2"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            <Keyboard size={18} />
+            {t('shortcuts.title')}
+          </Button>
+        </Section>
+
         <p className="text-center font-mono text-[var(--cc-text-caption)] text-muted">
-          сборка {BUILD_ID} · данные только на этом устройстве
+          {t('settings.buildLine', { build: BUILD_ID })}
         </p>
       </div>
 
@@ -267,6 +349,20 @@ export function SettingsPage() {
         }}
         onSave={handleSaveProvider}
       />
+
+      <SnippetSheet
+        // key перемонтирует форму при каждом открытии — тот же паттерн, что у ProviderSheet.
+        key={editingSnippet?.id ?? (addingSnippet ? 'new' : 'closed')}
+        open={addingSnippet || editingSnippet !== null}
+        snippet={editingSnippet}
+        onClose={() => {
+          setAddingSnippet(false);
+          setEditingSnippet(null);
+        }}
+        onSave={handleSaveSnippet}
+      />
+
+      <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }
@@ -280,3 +376,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     </section>
   );
 }
+
+// Default-экспорт — только ради React.lazy() в App.tsx (именованный импорт
+// туда не годится); именованный export выше остаётся для прямых импортов.
+export default SettingsPage;

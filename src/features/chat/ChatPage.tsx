@@ -1,25 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, useNavigate } from 'react-router';
-import { ArrowUp, Copy, Download, PanelLeft, Paperclip, RotateCcw, ScrollText, Settings, Sparkles, Square, X } from 'lucide-react';
+import {
+  Copy,
+  Download,
+  PanelLeft,
+  Pencil,
+  RotateCcw,
+  ScrollText,
+  Settings,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
 import { db } from '../../db/db';
 import type { Message, Provider } from '../../db/types';
 import { useToast } from '../../components/ui/toastContext';
 import { streamChat, errorText } from '../../lib/ai/client';
-import { compressImage, MAX_IMAGES } from '../../lib/images';
-import { formatCost, modelLabel } from '../../lib/ai/models';
+import { formatCost, modelIds, modelLabel } from '../../lib/ai/models';
 import {
   addAssistantMessage,
   addErrorMessage,
   addUserMessage,
   chatMessages,
   createChat,
+  editUserMessage,
   exportMarkdown,
   listChats,
   patchChat,
-  removeMessage,
+  removeBranch,
   toContext,
 } from '../../lib/ai/chatRepo';
+import { buildPath, nodeOf, parentMap } from '../../lib/ai/tree';
+import { useT } from '../../lib/i18n';
 import { Markdown } from './Markdown';
 import { LiveReasoning, ReasoningBlock } from './ReasoningBlock';
 import { Sidebar } from './Sidebar';
@@ -28,16 +40,40 @@ import { CompareGroup } from './CompareGroup';
 import { CompareBar } from './CompareBar';
 import { CommandPalette } from './CommandPalette';
 import { PersonaSheet } from './PersonaSheet';
+import { VersionNav } from './VersionNav';
+import { RegenerateMenu } from './RegenerateMenu';
+import { Composer, type ComposerHandle } from './Composer';
+import { ShortcutsSheet } from './ShortcutsSheet';
 import { groupRuns } from '../../lib/ai/chatRepo';
 import { uid } from '../../lib/repo';
+
+/**
+ * Куда уйдёт регенерация ответа: обычно это прямой родитель (вопрос) узла —
+ * тогда buildPath до него даёт контекст без старого ответа. Родитель null
+ * (узел — корень после повреждённых/legacy данных) — ищем ближайший
+ * user-вопрос назад по текущему активному пути; не нашли — регенерация
+ * недоступна.
+ */
+function regenerateLeafFor(messages: Message[], path: Message[], message: Message): string | null {
+  const node = nodeOf(messages, message);
+  const direct = parentMap(messages).get(node.id) ?? null;
+  if (direct) return direct;
+  const idx = path.findIndex((m) => m.id === node.id);
+  for (let i = idx - 1; i >= 0; i--) {
+    if (path[i].role === 'user') return nodeOf(messages, path[i]).id;
+  }
+  return null;
+}
 
 export function ChatPage() {
   const toast = useToast();
   const navigate = useNavigate();
+  const t = useT();
   const [pickedId, setPickedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // Правка своего сообщения: id вопроса, вместо пузыря которого сейчас textarea.
+  const [editingId, setEditingId] = useState<string | null>(null);
   // Текст ответа во время генерации живёт в состоянии React, а НЕ в Dexie:
   // запись каждого чанка в наблюдаемую таблицу перечитывала бы весь чат и
   // перерисовывала ленту десятки раз в секунду. В базу уходит один раз, в конце.
@@ -49,12 +85,15 @@ export function ChatPage() {
   const [compareStream, setCompareStream] = useState<Record<number, string>>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
-  const [images, setImages] = useState<string[]>([]);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [viewer, setViewer] = useState<string | null>(null);
+  // Свёрнутый сайдбар на широком экране (⌘B) — переживает перезагрузку.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('ai-platform.sidebarCollapsed') === 'true',
+  );
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<ComposerHandle>(null);
   const creating = useRef(false);
   const atBottom = useRef(true);
 
@@ -75,6 +114,16 @@ export function ChatPage() {
     [] as Message[],
   );
   const provider = providers.find((p) => p.id === (chat?.providerId ?? settings?.activeProviderId)) ?? null;
+  // Активный путь дерева версий — от корня до activeLeafId чата. Для старых
+  // линейных чатов (все parentId===undefined) совпадает с messages целиком.
+  const path = useMemo(() => buildPath(messages, chat?.activeLeafId), [messages, chat?.activeLeafId]);
+  // Примитивы вместо целого объекта settings в зависимостях ask/askCompare:
+  // settings — один Dexie-объект, и смена ЛЮБОГО его поля (тема, язык) даёт
+  // новую ссылку целиком. Если зависеть от объекта, ask/askCompare
+  // пересоздавались бы на каждый такой чих и рвали React.memo у сообщений
+  // ленты ниже — они получают ask через handleRegenerate/handleSubmitEdit.
+  const historyLimit = settings?.historyLimit ?? 20;
+  const hasSettings = !!settings;
 
   useEffect(() => {
     if (chats === undefined || chats.length || creating.current || !settings) return;
@@ -99,8 +148,8 @@ export function ChatPage() {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const ask = useCallback(
-    async (afterRemove?: string) => {
-      if (!chat || !settings) return;
+    async (opts?: { leafId?: string; model?: string; providerId?: string }) => {
+      if (!chat || !hasSettings) return;
       setBusy(true);
       setStreamText('');
       setStreamThink('');
@@ -111,15 +160,24 @@ export function ChatPage() {
       // во время рендера.
       let partial = '';
       let think = '';
+      // Свежий чат из БД: activeLeafId мог только что смениться (правка,
+      // переключение версии) прямо перед вызовом — chat из useLiveQuery мог
+      // ещё не перечитаться.
+      const freshChat = (await db.chats.get(chat.id)) ?? chat;
+      const leafId = opts?.leafId ?? freshChat.activeLeafId ?? null;
+      const useModel = opts?.model ?? chat.model;
+      const useProviderId = opts?.providerId ?? chat.providerId;
+      const useProvider = providers.find((p) => p.id === useProviderId) ?? null;
       try {
-        if (afterRemove) await removeMessage(afterRemove);
-        const history = toContext(await chatMessages(chat.id), settings.historyLimit);
+        const history = toContext(await chatMessages(chat.id), historyLimit, leafId);
         const reply = await streamChat({
-          provider,
+          provider: useProvider,
           messages: history,
           systemPrompt: chat.systemPrompt,
-          model: chat.model,
+          model: useModel,
           signal: ac.signal,
+          temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+          maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
           onDelta: (piece) => {
             partial += piece;
             setStreamText(partial);
@@ -129,20 +187,20 @@ export function ChatPage() {
             setStreamThink(think);
           },
         });
-        await addAssistantMessage(chat.id, reply);
+        await addAssistantMessage(chat.id, reply, { parentId: leafId ?? null, provider: useProvider });
       } catch (e) {
         // Прерванный ответ не выбрасываем: сохраняем то, что успело прийти —
         // иначе человек теряет полезный текст из-за случайного «стоп».
         // Частичные мысли не сохраняем: недописанные мысли не несут ценности
         // и усложняют ветку аборта.
         if ((e as { code?: string })?.code === 'aborted' && partial.trim()) {
-          await addAssistantMessage(chat.id, {
-            content: `${partial}\n\n_(остановлено)_`,
-            model: chat.model,
-            usage: { in: 0, out: 0 },
-          });
+          await addAssistantMessage(
+            chat.id,
+            { content: `${partial}\n\n${t('chat.stoppedNote')}`, model: useModel, usage: { in: 0, out: 0 } },
+            { parentId: leafId ?? null },
+          );
         } else {
-          await addErrorMessage(chat.id, errorText(e));
+          await addErrorMessage(chat.id, errorText(e), { parentId: leafId ?? null });
         }
       } finally {
         abortRef.current = null;
@@ -151,7 +209,7 @@ export function ChatPage() {
         setBusy(false);
       }
     },
-    [chat, settings, provider],
+    [chat, hasSettings, historyLimit, providers, t],
   );
 
   /**
@@ -160,14 +218,16 @@ export function ChatPage() {
    * остальные — каждая обрабатывается отдельно.
    */
   const askCompare = useCallback(
-    async (picks: { providerId: string; model: string }[]) => {
-      if (!chat || !settings) return;
+    async (picks: { providerId: string; model: string }[], opts?: { leafId?: string }) => {
+      if (!chat || !hasSettings) return;
       setBusy(true);
       setCompareStream({});
       const ac = new AbortController();
       abortRef.current = ac;
       const runId = uid();
-      const history = toContext(await chatMessages(chat.id), settings.historyLimit);
+      const freshChat = (await db.chats.get(chat.id)) ?? chat;
+      const leafId = opts?.leafId ?? freshChat.activeLeafId ?? null;
+      const history = toContext(await chatMessages(chat.id), historyLimit, leafId);
       try {
         await Promise.all(
           picks.map(async (pick, i) => {
@@ -180,6 +240,8 @@ export function ChatPage() {
                 systemPrompt: chat.systemPrompt,
                 model: pick.model,
                 signal: ac.signal,
+                temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+                maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
                 onDelta: (piece) => {
                   partial += piece;
                   setCompareStream((s) => ({ ...s, [i]: partial }));
@@ -187,9 +249,13 @@ export function ChatPage() {
               });
               // Первая колонка становится выбранной по умолчанию: контекст
               // не должен оставаться пустым, если человек не нажал «выбрать».
-              await addAssistantMessage(chat.id, reply, { runId, runIndex: i, chosen: i === 0 });
+              await addAssistantMessage(chat.id, reply, {
+                run: { runId, runIndex: i, chosen: i === 0 },
+                provider: prov,
+                parentId: leafId ?? null,
+              });
             } catch (e) {
-              await addErrorMessage(chat.id, errorText(e), { runId, runIndex: i });
+              await addErrorMessage(chat.id, errorText(e), { run: { runId, runIndex: i }, parentId: leafId ?? null });
             }
           }),
         );
@@ -199,57 +265,111 @@ export function ChatPage() {
         setBusy(false);
       }
     },
-    [chat, settings, providers],
+    [chat, hasSettings, historyLimit, providers],
   );
 
-  // Сжимаем и добавляем картинки по одной: одна битая не должна ронять
-  // остальные, а лимит режем ДО чтения — чтобы не тратить время на файлы,
-  // которые всё равно не влезут.
-  async function addFiles(list: ArrayLike<File | null> | FileList | null) {
-    const files = Array.from(list ?? []).filter((f): f is File => !!f && f.type.startsWith('image/'));
-    const room = MAX_IMAGES - images.length;
-    if (files.length > room) toast('Не больше 4 изображений');
-    for (const f of files.slice(0, room)) {
-      try {
-        const url = await compressImage(f);
-        setImages((prev) => (prev.length >= MAX_IMAGES ? prev : [...prev, url]));
-      } catch {
-        toast('Не удалось прочитать изображение');
-      }
-    }
+  /** Отправка из композера: черновик и картинки уже очищены им самим. */
+  async function handleSend(text: string, images: string[]) {
+    if (!chat) return;
+    atBottom.current = true;
+    const msg = await addUserMessage(chat, text, images.length ? images : undefined);
+    if (comparePicks.length > 1) await askCompare(comparePicks, { leafId: msg.id });
+    else await ask({ leafId: msg.id });
+    composerRef.current?.focus();
   }
 
-  async function handleSend() {
-    const text = draft.trim();
-    if ((!text && !images.length) || busy || !chat) return;
-    setDraft('');
-    if (inputRef.current) inputRef.current.style.height = 'auto';
-    atBottom.current = true;
-    const imgs = images;
-    setImages([]);
-    await addUserMessage(chat, text, imgs.length ? imgs : undefined);
-    if (comparePicks.length > 1) await askCompare(comparePicks);
-    else await ask();
-    inputRef.current?.focus();
-  }
+  /** Отмена правки вопроса — стабильная ссылка для onCancelEdit в UserBubble. */
+  const cancelEdit = useCallback(() => setEditingId(null), []);
+
+  /** Переключить активный лист чата — общий обработчик для VersionNav везде в ленте. */
+  const switchLeaf = useCallback(
+    (leafId: string) => {
+      if (!chat) return;
+      void patchChat(chat.id, { activeLeafId: leafId });
+    },
+    [chat],
+  );
+
+  /** Правка вопроса: новый сиблинг-вопрос + запрос ответа от его имени. */
+  const handleSubmitEdit = useCallback(
+    async (message: Message, text: string) => {
+      if (!chat) return;
+      const trimmed = text.trim();
+      if (!trimmed && !message.images?.length) return;
+      setEditingId(null);
+      const msg = await editUserMessage(chat, message, trimmed);
+      await ask({ leafId: msg.id });
+    },
+    [chat, ask],
+  );
+
+  /** Регенерация ответа: «та же модель» (opts не передан) либо конкретная модель из меню. */
+  const handleRegenerate = useCallback(
+    async (message: Message, opts?: { model: string; providerId: string }) => {
+      const leafId = regenerateLeafFor(messages, path, message);
+      if (!leafId) return;
+      await ask({ leafId, model: opts?.model, providerId: opts?.providerId });
+    },
+    [messages, path, ask],
+  );
+
+  /** ⌘B: свернуть/развернуть постоянную боковую панель на широком экране. */
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((v) => {
+      const next = !v;
+      localStorage.setItem('ai-platform.sidebarCollapsed', String(next));
+      return next;
+    });
+  }, []);
+
+  /** ↑ в пустом композере: правка последнего своего вопроса активного пути. */
+  const handleEditLast = useCallback(() => {
+    if (editingId) return; // правка уже открыта — не перескакиваем на другую
+    for (let i = path.length - 1; i >= 0; i--) {
+      if (path[i].role === 'user') {
+        setEditingId(nodeOf(messages, path[i]).id);
+        return;
+      }
+    }
+  }, [path, messages, editingId]);
+
+  /** Мягкое удаление ветки версий (сообщение + все его версии-потомки). */
+  const handleDeleteBranch = useCallback(
+    async (id: string) => {
+      if (!chat) return;
+      if (!window.confirm(t('msg.deleteBranchConfirm'))) return;
+      await removeBranch(chat, id);
+    },
+    [chat, t],
+  );
 
   async function handleNewChat() {
     if (!settings) return;
     const c = await createChat(settings.activeProviderId ?? 'demo', settings.defaultModel);
     setPickedId(c.id);
     setNavOpen(false);
-    setDraft('');
-    inputRef.current?.focus();
+    // Черновик — внутреннее состояние композера; insertText('') очищает его
+    // тем же императивным путём, что и вставка сниппета.
+    composerRef.current?.insertText('');
+    composerRef.current?.focus();
   }
 
-  async function copyText(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast('Скопировано');
-    } catch {
-      toast('Не удалось скопировать');
-    }
-  }
+  // useCallback — не только сама функция стабильна между рендерами (toast и t
+  // не меняются), но и одна и та же ссылка уходит как onCopy сразу в
+  // UserBubble/AssistantBlock/CompareGroup из .map() ниже: без этого memo на
+  // них был бы бесполезен — новый onCopy на каждый рендер ChatPage провалил
+  // бы поверхностное сравнение пропов.
+  const copyText = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast(t('chat.copied'));
+      } catch {
+        toast(t('chat.copyFailed'));
+      }
+    },
+    [toast, t],
+  );
 
   function handleExport() {
     if (!chat) return;
@@ -257,7 +377,7 @@ export function ChatPage() {
     const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${chat.title.replace(/[^\wа-яА-ЯёЁ -]/g, '')}.md`;
+    a.download = `${(chat.title || t('chat.newChat')).replace(/[^\wа-яА-ЯёЁ -]/g, '')}.md`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -275,9 +395,15 @@ export function ChatPage() {
         void handleNewChat();
       } else if (meta && e.key === '/') {
         e.preventDefault();
-        inputRef.current?.focus();
-      } else if (e.key === 'Escape' && viewer) {
-        setViewer(null);
+        composerRef.current?.focus();
+      } else if (meta && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        toggleSidebar();
+      } else if (e.key === 'Escape') {
+        // Остановка активной генерации приоритетнее закрытия просмотрщика
+        // изображения — Esc во время ответа не должен молча закрывать не то.
+        if (busy) abortRef.current?.abort();
+        else if (viewer) setViewer(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -297,39 +423,64 @@ export function ChatPage() {
 
   return (
     <div className="fixed inset-0 flex bg-bg">
-      <Sidebar chats={list} activeId={chatId} onPick={setPickedId} onNew={() => void handleNewChat()} />
+      {/* Аврора: fixed-слой позади всего контента, вне потока — скролл ленты
+          его не задевает. Позиционированные (fixed) потомки красятся ПОСЛЕ
+          обычных статичных — без z-index на контент-обёртке ниже аврора легла
+          бы поверх сайдбара и текста, а не под ними. */}
+      <div aria-hidden className="cc-aurora pointer-events-none fixed inset-0" />
 
-      {/* Мобильная панель поверх экрана */}
-      {navOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <button aria-label="Закрыть" className="animate-fade-in absolute inset-0 bg-black/50" onClick={() => setNavOpen(false)} />
-          <div className="relative animate-fade-in">
-            <Sidebar
-              chats={list}
-              activeId={chatId}
-              onPick={(id) => {
-                setPickedId(id);
-                setNavOpen(false);
-              }}
-              onNew={() => void handleNewChat()}
-              overlay
-              onClose={() => setNavOpen(false)}
-            />
+      <div className="relative z-10 flex w-full">
+        <Sidebar
+          chats={list}
+          activeId={chatId}
+          onPick={setPickedId}
+          onNew={() => void handleNewChat()}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+
+        {/* Мобильная панель поверх экрана */}
+        {navOpen && (
+          <div className="fixed inset-0 z-50 flex lg:hidden">
+            <button aria-label={t('common.close')} className="animate-fade-in absolute inset-0 bg-black/50" onClick={() => setNavOpen(false)} />
+            <div className="relative animate-fade-in">
+              <Sidebar
+                chats={list}
+                activeId={chatId}
+                onPick={(id) => {
+                  setPickedId(id);
+                  setNavOpen(false);
+                }}
+                onNew={() => void handleNewChat()}
+                overlay
+                onClose={() => setNavOpen(false)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-1 border-b border-hairline px-2 pt-[calc(env(safe-area-inset-top)+8px)] pb-2">
           <button
-            aria-label="Чаты"
+            aria-label={t('chat.chatsAria')}
             onClick={() => setNavOpen(true)}
             className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted active:opacity-60 lg:hidden"
           >
             <PanelLeft size={20} />
           </button>
+          {/* Развернуть сайдбар обратно — видна ТОЛЬКО на широком экране и
+              ТОЛЬКО пока он свёрнут: другая aria-label, чем у мобильной кнопки
+              выше, поэтому смоук-селектор по 'Чаты' её не задевает. */}
+          <button
+            aria-label={t('nav.toggleSidebar')}
+            onClick={toggleSidebar}
+            className={`hidden size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-opacity active:opacity-60 ${
+              sidebarCollapsed ? 'lg:grid' : ''
+            }`}
+          >
+            <PanelLeft size={20} />
+          </button>
           <div className="min-w-0 flex-1 px-1">
-            <h1 className="truncate text-[0.95rem] font-semibold">{chat?.title ?? 'AI Platform'}</h1>
+            <h1 className="truncate text-[0.95rem] font-semibold">{chat ? chat.title || t('chat.newChat') : 'AI Platform'}</h1>
             {chat && (
               <ModelPicker
                 providers={providers}
@@ -340,17 +491,19 @@ export function ChatPage() {
             )}
           </div>
           <button
-            aria-label="Системный промпт"
+            aria-label={t('chat.systemPromptAria')}
             onClick={() => setPromptOpen(true)}
             disabled={!chat}
             className={`grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors active:opacity-60 ${
-              chat?.systemPrompt ? 'text-accent' : 'text-muted hover:text-text'
+              chat?.systemPrompt || chat?.temperature != null || chat?.maxTokens != null
+                ? 'text-accent'
+                : 'text-muted hover:text-text'
             }`}
           >
             <ScrollText size={18} />
           </button>
           <button
-            aria-label="Экспорт"
+            aria-label={t('chat.exportAria')}
             onClick={handleExport}
             disabled={!messages.length}
             className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
@@ -359,7 +512,7 @@ export function ChatPage() {
           </button>
           <Link
             to="/settings"
-            aria-label="Настройки"
+            aria-label={t('nav.settings')}
             className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 lg:hidden"
           >
             <Settings size={18} />
@@ -367,26 +520,67 @@ export function ChatPage() {
         </header>
 
         <div
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="cc-scroll min-h-0 flex-1 overflow-y-auto"
           onScroll={(e) => {
             const el = e.currentTarget;
             atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
         >
           <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-5">
-            {!messages.length && !streamText && <Welcome demo={provider?.isDemo ?? false} />}
-            {groupRuns(messages).map((item) =>
+            {!path.length && !streamText && (
+              <Welcome
+                demo={provider?.isDemo ?? false}
+                onPick={(text) => {
+                  composerRef.current?.insertText(text);
+                  composerRef.current?.focus();
+                }}
+              />
+            )}
+            {/* onCopy/onSwitch/onDeleteBranch/onStartEdit/onSubmitEdit/onRegenerate
+                передаются как ОДНА стабильная ссылка на все элементы списка
+                (не инлайн-замыкание на каждый item) — иначе React.memo ниже
+                бесполезен: новая функция-проп на каждый рендер ChatPage сама
+                по себе проваливает поверхностное сравнение. Компонент сам
+                прикладывает к ним свой message/id при вызове. */}
+            {groupRuns(path).map((item) =>
               Array.isArray(item) ? (
-                <CompareGroup key={item[0].id} group={item} onCopy={(t) => void copyText(t)} />
+                <CompareGroup
+                  key={item[0].id}
+                  group={item}
+                  messages={messages}
+                  busy={busy}
+                  onCopy={copyText}
+                  onSwitch={switchLeaf}
+                  onDeleteBranch={handleDeleteBranch}
+                />
               ) : item.role === 'user' ? (
-                <UserBubble key={item.id} message={item} onView={setViewer} />
+                <UserBubble
+                  key={item.id}
+                  message={item}
+                  messages={messages}
+                  busy={busy}
+                  editing={editingId === item.id}
+                  onStartEdit={setEditingId}
+                  onCancelEdit={cancelEdit}
+                  onSubmitEdit={handleSubmitEdit}
+                  onSwitch={switchLeaf}
+                  onView={setViewer}
+                  onCopy={copyText}
+                />
               ) : (
                 <AssistantBlock
                   key={item.id}
                   message={item}
+                  messages={messages}
                   busy={busy}
-                  onCopy={() => void copyText(item.content)}
-                  onRetry={() => void ask(item.id)}
+                  providers={providers}
+                  currentProviderId={chat?.providerId ?? null}
+                  currentModel={chat?.model ?? null}
+                  canRegenerate={regenerateLeafFor(messages, path, item) !== null}
+                  onCopy={copyText}
+                  onRegenerate={handleRegenerate}
+                  onSwitch={switchLeaf}
+                  onDeleteBranch={handleDeleteBranch}
                 />
               ),
             )}
@@ -408,93 +602,15 @@ export function ChatPage() {
               onChange={(keys) => void setComparePicks(keys)}
             />
           </div>
-          {images.length > 0 && (
-            <div className="mx-auto flex w-full max-w-3xl gap-2 px-4 pt-2">
-              {images.map((src, i) => (
-                <div key={i} className="relative shrink-0">
-                  <img src={src} alt="вложение" className="size-14 rounded-[var(--cc-radius-sm)] border border-hairline object-cover" />
-                  <button
-                    aria-label="Убрать изображение"
-                    className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-hairline bg-surface-2 text-muted active:opacity-60"
-                    onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
-                  >
-                    <X size={11} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+10px)]">
-            <button
-              aria-label="Прикрепить изображение"
-              disabled={busy || images.length >= MAX_IMAGES}
-              onClick={() => fileRef.current?.click()}
-              className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
-            >
-              <Paperclip size={19} />
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                void addFiles(e.target.files);
-                // Сброс value — иначе повторный выбор того же файла не даёт события change.
-                e.target.value = '';
-              }}
-            />
-            <textarea
-              ref={inputRef}
-              value={draft}
-              rows={1}
-              placeholder="Спросите что угодно…"
-              className="max-h-44 min-h-[var(--cc-touch)] flex-1 resize-none rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 outline-none transition-shadow placeholder:text-muted focus:shadow-[0_0_0_1px_var(--app-accent)]"
-              onChange={(e) => {
-                setDraft(e.target.value);
-                // Авторост: сбрасываем высоту перед замером, иначе не сжимается.
-                e.target.style.height = 'auto';
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 176)}px`;
-              }}
-              onKeyDown={(e) => {
-                // Enter отправляет только с физической клавиатурой: на телефоне
-                // это перевод строки, иначе многострочное не написать.
-                if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(pointer: fine)').matches) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
-              onPaste={(e) => {
-                // Картинки из буфера — как выбор файлов; текстовые вставки не трогаем.
-                const files = Array.from(e.clipboardData.items)
-                  .filter((i) => i.type.startsWith('image/'))
-                  .map((i) => i.getAsFile());
-                if (files.length) {
-                  e.preventDefault();
-                  void addFiles(files);
-                }
-              }}
-            />
-            {busy ? (
-              <button
-                aria-label="Остановить"
-                className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-surface-2 transition-opacity active:opacity-70"
-                onClick={() => abortRef.current?.abort()}
-              >
-                <Square size={15} />
-              </button>
-            ) : (
-              <button
-                aria-label="Отправить"
-                disabled={!draft.trim() && !images.length}
-                className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:opacity-25"
-                onClick={() => void handleSend()}
-              >
-                <ArrowUp size={19} />
-              </button>
-            )}
-          </div>
+        </div>
+        <Composer
+          ref={composerRef}
+          busy={busy}
+          canSend={!!chat}
+          onSend={handleSend}
+          onStop={() => abortRef.current?.abort()}
+          onEditLast={handleEditLast}
+        />
         </div>
       </div>
 
@@ -504,6 +620,8 @@ export function ChatPage() {
         chat={chat}
         onClose={() => setPromptOpen(false)}
       />
+
+      <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       <CommandPalette
         open={paletteOpen}
@@ -520,10 +638,14 @@ export function ChatPage() {
           })
         }
         onToggleCompare={() => {
-          const all = providers.flatMap((p) => p.models.map((m) => `${p.id}:${m}`));
+          const all = providers.flatMap((p) => modelIds(p.models).map((m) => `${p.id}:${m}`));
           void setComparePicks(settings?.compareModels?.length ? [] : all.slice(0, 2));
         }}
         onOpenSettings={() => navigate('/settings')}
+        onOpenShortcuts={() => {
+          setPaletteOpen(false);
+          setShortcutsOpen(true);
+        }}
       />
 
       {viewer && (
@@ -531,34 +653,88 @@ export function ChatPage() {
           className="animate-fade-in fixed inset-0 z-[80] grid place-items-center bg-black/80 p-3"
           onClick={() => setViewer(null)}
         >
-          <img src={viewer} alt="изображение" className="max-h-[92dvh] max-w-full rounded-[var(--cc-radius)]" />
+          <img src={viewer} alt={t('chat.imageAlt')} className="max-h-[92dvh] max-w-full rounded-[var(--cc-radius)]" />
         </div>
       )}
     </div>
   );
 }
 
-function Welcome({ demo }: { demo: boolean }) {
+function Welcome({ demo, onPick }: { demo: boolean; onPick: (text: string) => void }) {
+  const t = useT();
+  const chips = [t('welcome.chip1'), t('welcome.chip2'), t('welcome.chip3'), t('welcome.chip4')];
   return (
     <div className="flex flex-col items-center gap-3 py-24 text-center">
       <div className="grid size-14 place-items-center rounded-[var(--cc-radius)] bg-surface-2 text-accent">
         <Sparkles size={26} />
       </div>
-      <p className="font-medium">Спросите что угодно</p>
+      <p className="font-medium">{t('chat.welcomeTitle')}</p>
       <p className="max-w-xs text-sm leading-relaxed text-muted">
-        {demo
-          ? 'Сейчас отвечает встроенная заглушка. Чтобы получать настоящие ответы, добавьте провайдера в настройках.'
-          : 'Ключи хранятся только на этом устройстве и уходят напрямую провайдеру.'}
+        {demo ? t('chat.welcomeDemo') : t('chat.welcomeReal')}
       </p>
+      <div className="mt-1 flex max-w-md flex-wrap items-center justify-center gap-2">
+        {chips.map((chip) => (
+          <button
+            key={chip}
+            onClick={() => onPick(chip)}
+            className="min-h-[var(--cc-touch)] rounded-full border border-hairline px-3 py-2 text-sm transition-colors hover:border-accent active:opacity-70"
+          >
+            {chip}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
+interface UserBubbleProps {
+  message: Message;
+  messages: Message[];
+  busy: boolean;
+  editing: boolean;
+  onStartEdit: (id: string) => void;
+  onCancelEdit: () => void;
+  onSubmitEdit: (message: Message, text: string) => void;
+  onSwitch: (leafId: string) => void;
+  onView: (src: string) => void;
+  onCopy: (text: string) => void;
+}
+
 /** Вопрос — пузырь справа. Ответ пузырём НЕ оформляем: в Claude Code это
- *  поток на всю ширину с маркером, и эта асимметрия узнаётся сразу. */
-function UserBubble({ message, onView }: { message: Message; onView: (src: string) => void }) {
+ *  поток на всю ширину с маркером, и эта асимметрия узнаётся сразу.
+ *
+ *  memo: пропы из ChatPage — сплошь стабильные ссылки (см. .map() выше),
+ *  поэтому во время стрима ответа или набора текста в композере ни один
+ *  UserBubble ленты не перерисовывается — меняется только сам streaming-блок. */
+const UserBubble = memo(function UserBubble({
+  message,
+  messages,
+  busy,
+  editing,
+  onStartEdit,
+  onCancelEdit,
+  onSubmitEdit,
+  onSwitch,
+  onView,
+  onCopy,
+}: UserBubbleProps) {
+  const t = useT();
+
+  if (editing) {
+    return (
+      <EditBox
+        key={message.id}
+        message={message}
+        onCancel={onCancelEdit}
+        onSubmit={(text) => onSubmitEdit(message, text)}
+      />
+    );
+  }
+
+  const node = nodeOf(messages, message);
+
   return (
-    <div className="flex justify-end">
+    <div className="group animate-msg-in flex flex-col items-end">
       <div className="max-w-[85%] rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-[var(--cc-text-body)] whitespace-pre-wrap">
         {message.images?.length ? (
           <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
@@ -566,7 +742,7 @@ function UserBubble({ message, onView }: { message: Message; onView: (src: strin
               <button key={i} onClick={() => onView(src)} className="active:opacity-70">
                 <img
                   src={src}
-                  alt="вложение"
+                  alt={t('chat.attachmentAlt')}
                   className="h-28 w-auto max-w-full cursor-zoom-in rounded-[var(--cc-radius-sm)] border border-hairline object-cover"
                 />
               </button>
@@ -575,25 +751,131 @@ function UserBubble({ message, onView }: { message: Message; onView: (src: strin
         ) : null}
         {message.content ? message.content : null}
       </div>
+      <div className="mt-1 flex items-center gap-2 font-mono text-[var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
+        <button
+          aria-label={t('msg.edit')}
+          disabled={busy}
+          className="p-1 active:opacity-60 disabled:opacity-25"
+          onClick={() => onStartEdit(message.id)}
+        >
+          <Pencil size={13} />
+        </button>
+        <button aria-label={t('chat.copy')} className="p-1 active:opacity-60" onClick={() => onCopy(message.content)}>
+          <Copy size={13} />
+        </button>
+        <VersionNav messages={messages} node={node} disabled={busy} onSwitch={onSwitch} />
+      </div>
+    </div>
+  );
+});
+
+/**
+ * Режим правки вопроса: отдельный компонент, а не ветка внутри UserBubble —
+ * состояние черновика инициализируется из пропа один раз при монтировании
+ * (родитель монтирует/размонтирует его переключением editing), без
+ * useEffect+setState для сброса.
+ */
+function EditBox({
+  message,
+  onCancel,
+  onSubmit,
+}: {
+  message: Message;
+  onCancel: () => void;
+  onSubmit: (text: string) => void;
+}) {
+  const t = useT();
+  const [text, setText] = useState(message.content);
+
+  return (
+    <div className="flex justify-end">
+      <div className="w-full max-w-[85%] space-y-2">
+        <textarea
+          // Callback-ref: авторост высоты и фокус в момент появления в DOM —
+          // не запись в существующий ref во время рендера, а инициализация
+          // только что смонтированного узла.
+          ref={(el) => {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
+            el.focus();
+            el.setSelectionRange(el.value.length, el.value.length);
+          }}
+          value={text}
+          rows={1}
+          className="max-h-80 min-h-[var(--cc-touch)] w-full resize-none rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-base outline-none transition-shadow focus:shadow-[0_0_0_1px_var(--app-accent)]"
+          onChange={(e) => {
+            setText(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 320)}px`;
+          }}
+          onKeyDown={(e) => {
+            // Enter отправляет только с физической клавиатурой — как в композере.
+            if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(pointer: fine)').matches) {
+              e.preventDefault();
+              onSubmit(text);
+            } else if (e.key === 'Escape') {
+              onCancel();
+            }
+          }}
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            className="rounded-[var(--cc-radius-sm)] px-3 py-1.5 text-sm text-muted transition-colors hover:text-text active:opacity-60"
+            onClick={onCancel}
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            className="rounded-[var(--cc-radius-sm)] bg-accent px-3 py-1.5 text-sm text-white active:opacity-80 disabled:opacity-40"
+            disabled={!text.trim() && !message.images?.length}
+            onClick={() => onSubmit(text)}
+          >
+            {t('common.send')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function AssistantBlock({
-  message,
-  busy,
-  onCopy,
-  onRetry,
-}: {
+interface AssistantBlockProps {
   message: Message;
+  messages: Message[];
   busy: boolean;
-  onCopy: () => void;
-  onRetry: () => void;
-}) {
+  providers: Provider[];
+  currentProviderId: string | null;
+  currentModel: string | null;
+  canRegenerate: boolean;
+  onCopy: (text: string) => void;
+  onRegenerate: (message: Message, opts?: { model: string; providerId: string }) => void;
+  onSwitch: (leafId: string) => void;
+  onDeleteBranch: (id: string) => void;
+}
+
+/** memo — см. комментарий у UserBubble: пропы из ChatPage стабильны между
+ *  рендерами, поэтому готовые ответы ленты не пересчитываются на стрим
+ *  соседнего сообщения. */
+const AssistantBlock = memo(function AssistantBlock({
+  message,
+  messages,
+  busy,
+  providers,
+  currentProviderId,
+  currentModel,
+  canRegenerate,
+  onCopy,
+  onRegenerate,
+  onSwitch,
+  onDeleteBranch,
+}: AssistantBlockProps) {
+  const t = useT();
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null);
   const failed = message.status === 'error';
   const cost = formatCost(message.costRub);
+  const node = nodeOf(messages, message);
   return (
-    <div className="group grid grid-cols-[var(--cc-marker-col)_1fr]">
+    <div className="group animate-msg-in grid grid-cols-[var(--cc-marker-col)_1fr]">
       <div aria-hidden className="pt-[0.55rem]">
         <span className={`block size-1.5 rounded-full ${failed ? 'bg-danger' : 'bg-accent'}`} />
       </div>
@@ -606,7 +888,7 @@ function AssistantBlock({
             <Markdown text={message.content} />
           </>
         )}
-        <div className="mt-2 flex items-center gap-3 font-mono text-[var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
+        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
           {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
             <span>
               {message.tokensIn}→{message.tokensOut}
@@ -615,23 +897,42 @@ function AssistantBlock({
           ) : null}
           {!failed && message.model && <span className="truncate">{modelLabel(message.model)}</span>}
           {!failed && (
-            <button aria-label="Скопировать" className="p-1 active:opacity-60" onClick={onCopy}>
+            <button aria-label={t('chat.copy')} className="p-1 active:opacity-60" onClick={() => onCopy(message.content)}>
               <Copy size={13} />
             </button>
           )}
+          <VersionNav messages={messages} node={node} disabled={busy} onSwitch={onSwitch} />
           <button
-            aria-label="Повторить"
-            disabled={busy}
+            aria-label={t('chat.retry')}
+            disabled={busy || !canRegenerate}
             className="p-1 active:opacity-60 disabled:opacity-25"
-            onClick={onRetry}
+            onClick={(e) => setMenuRect(e.currentTarget.getBoundingClientRect())}
           >
             <RotateCcw size={13} />
           </button>
+          <button
+            aria-label={t('msg.deleteBranch')}
+            disabled={busy}
+            className="p-1 transition-colors hover:text-danger active:opacity-60 disabled:opacity-25"
+            onClick={() => onDeleteBranch(node.id)}
+          >
+            <Trash2 size={13} />
+          </button>
         </div>
       </div>
+      {menuRect && (
+        <RegenerateMenu
+          rect={menuRect}
+          providers={providers}
+          currentProviderId={currentProviderId}
+          currentModel={currentModel}
+          onClose={() => setMenuRect(null)}
+          onPick={(opts) => onRegenerate(message, opts)}
+        />
+      )}
     </div>
   );
-}
+});
 
 /** Колонки сравнения во время генерации: все потоки печатаются одновременно. */
 function StreamingCompare({
@@ -641,13 +942,14 @@ function StreamingCompare({
   picks: { providerId: string; model: string }[];
   texts: Record<number, string>;
 }) {
+  const t = useT();
   return (
     <div className="grid grid-cols-[var(--cc-marker-col)_1fr]">
       <div aria-hidden className="pt-[0.55rem]">
         <span className="block size-1.5 animate-pulse rounded-full bg-accent" />
       </div>
       <div className="min-w-0">
-        <p className="mb-2 font-mono text-[var(--cc-text-caption)] text-muted">сравнение · {picks.length}</p>
+        <p className="mb-2 font-mono text-[var(--cc-text-caption)] text-muted">{t('compare.count', { n: picks.length })}</p>
         <div
           className="space-y-2 lg:grid lg:gap-3 lg:space-y-0"
           style={{ gridTemplateColumns: `repeat(${picks.length}, minmax(0, 1fr))` }}
@@ -664,7 +966,8 @@ function StreamingCompare({
                 </>
               ) : (
                 <p className="font-mono text-[var(--cc-text-caption)] text-muted">
-                  ждёт<span className="animate-caret">▍</span>
+                  {t('compare.waiting')}
+                  <span className="animate-caret">▍</span>
                 </p>
               )}
             </article>
@@ -677,6 +980,7 @@ function StreamingCompare({
 
 /** Ответ во время генерации: тот же рендер, что и у готового, плюс каретка. */
 function Streaming({ text, think }: { text: string; think: string }) {
+  const t = useT();
   return (
     <div className="grid grid-cols-[var(--cc-marker-col)_1fr]">
       <div aria-hidden className="pt-[0.55rem]">
@@ -691,7 +995,8 @@ function Streaming({ text, think }: { text: string; think: string }) {
           </>
         ) : !think ? (
           <p className="font-mono text-[var(--cc-text-meta)] text-muted">
-            думает<span className="animate-caret">▍</span>
+            {t('chat.thinking')}
+            <span className="animate-caret">▍</span>
           </p>
         ) : null}
       </div>

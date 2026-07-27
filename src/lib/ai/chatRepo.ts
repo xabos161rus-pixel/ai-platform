@@ -1,13 +1,15 @@
 import { db } from '../../db/db';
 import { alive, now, stamp, uid } from '../repo';
-import type { BaseEntity, Chat, Message } from '../../db/types';
+import type { BaseEntity, Chat, Message, Provider } from '../../db/types';
 import { costRub } from './models';
 import type { ChatMessage, Reply } from './client';
+import { buildPath, leafAfterRemoval, nodeOf, parentMap, subtreeIds } from './tree';
+import { t } from '../i18n';
 
 /** Заголовок чата из первого вопроса — короткая первая строка без хвостов. */
 export function autoTitle(text: string): string {
   const line = text.trim().split('\n')[0].trim();
-  if (!line) return 'Без названия';
+  if (!line) return t('chat.untitled');
   return line.length > 48 ? `${line.slice(0, 48).trimEnd()}…` : line;
 }
 
@@ -22,12 +24,15 @@ export async function listChats(): Promise<Chat[]> {
 
 export async function createChat(providerId: string, model: string): Promise<Chat> {
   const chat = stamp<Chat>({
-    title: 'Новый чат',
+    // Пусто, а не сентинел-строка: UI показывает title || t('chat.newChat'),
+    // и на EN-локали пользователь не увидит русское «Новый чат» в данных.
+    title: '',
     providerId,
     model,
     systemPrompt: '',
     lastMessageAt: null,
     pinned: false,
+    activeLeafId: null,
   });
   await db.chats.add(chat);
   return chat;
@@ -52,54 +57,137 @@ export async function chatMessages(chatId: string): Promise<Message[]> {
   return rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-async function addMessage(data: Omit<Message, keyof BaseEntity>): Promise<Message> {
+/**
+ * @param asActiveLeaf Сдвинуть activeLeafId чата на это же сообщение — в ОДНОЙ
+ * транзакции с lastMessageAt, а не отдельным вызовом patchChat следом. Два
+ * последовательных db.chats.update по одной и той же записи давали окно между
+ * ними, где useLiveQuery(chats) успевал отрисовать чат с уже новым
+ * lastMessageAt, но ещё старым activeLeafId (и наоборот) — на медленной
+ * машине (или при плотном потоке событий, как обрыв генерации по Esc сразу
+ * после отправки) React иногда фиксировал именно этот промежуточный кадр,
+ * и лента переставала показывать только что добавленный ответ. Один вызов
+ * update() — одна запись в IndexedDB — одно избежание гонки.
+ */
+async function addMessage(
+  data: Omit<Message, keyof BaseEntity>,
+  opts?: { asActiveLeaf?: boolean },
+): Promise<Message> {
   const row: Message = { ...data, id: uid(), createdAt: now(), updatedAt: now(), deletedAt: null };
   await db.messages.add(row);
-  await db.chats.update(data.chatId, { lastMessageAt: row.createdAt, updatedAt: row.createdAt });
+  await db.chats.update(data.chatId, {
+    lastMessageAt: row.createdAt,
+    updatedAt: row.createdAt,
+    ...(opts?.asActiveLeaf ? { activeLeafId: row.id } : {}),
+  });
   return row;
 }
 
-export async function addUserMessage(chat: Chat, content: string, images?: string[]): Promise<Message> {
+/**
+ * @param parentId Явный родитель нового сообщения. Не передан — вычисляется
+ * от текущего активного листа чата: новое сообщение продолжает ту ветку, на
+ * которую сейчас смотрит чат (обычный случай отправки вопроса).
+ */
+export async function addUserMessage(
+  chat: Chat,
+  content: string,
+  images?: string[],
+  parentId?: string | null,
+): Promise<Message> {
   // Первый вопрос даёт чату имя — руками переименовывать не нужно. Вопрос из
   // одних картинок (без текста) тоже достоин заголовка, а не пустой строки.
-  if (chat.title === 'Новый чат') {
-    const title = !content.trim() && images?.length ? 'Изображение' : autoTitle(content);
+  // Проверяем и '', и legacy-сентинел 'Новый чат' — старые чаты писали его
+  // прямо в данные до этой задачи.
+  if (chat.title === '' || chat.title === 'Новый чат') {
+    const title = !content.trim() && images?.length ? t('chat.imageTitle') : autoTitle(content);
     await patchChat(chat.id, { title });
   }
-  return addMessage({
-    chatId: chat.id,
-    role: 'user',
-    content,
-    model: null,
-    tokensIn: null,
-    tokensOut: null,
-    costRub: null,
-    status: 'done',
-    error: null,
-    images: images?.length ? images : undefined,
-  });
+  let effectiveParentId = parentId;
+  if (effectiveParentId === undefined) {
+    const liveMsgs = await chatMessages(chat.id);
+    const path = buildPath(liveMsgs, chat.activeLeafId);
+    const last = path[path.length - 1];
+    effectiveParentId = last ? nodeOf(liveMsgs, last).id : null;
+  }
+  const row = await addMessage(
+    {
+      chatId: chat.id,
+      role: 'user',
+      content,
+      model: null,
+      tokensIn: null,
+      tokensOut: null,
+      costRub: null,
+      status: 'done',
+      error: null,
+      images: images?.length ? images : undefined,
+      parentId: effectiveParentId,
+    },
+    { asActiveLeaf: true },
+  );
+  return row;
+}
+
+/**
+ * Правка вопроса без потери истории: создаёт НОВОЕ user-сообщение-сиблинга
+ * (тот же эффективный родитель, что и у original), а не переписывает старое —
+ * старый вопрос и его ответ остаются доступной версией.
+ */
+export async function editUserMessage(chat: Chat, original: Message, content: string): Promise<Message> {
+  const liveMsgs = await chatMessages(chat.id);
+  const parentId = parentMap(liveMsgs).get(original.id) ?? null;
+  const row = await addMessage(
+    {
+      chatId: chat.id,
+      role: 'user',
+      content,
+      model: null,
+      tokensIn: null,
+      tokensOut: null,
+      costRub: null,
+      status: 'done',
+      error: null,
+      images: original.images,
+      parentId,
+    },
+    { asActiveLeaf: true },
+  );
+  return row;
 }
 
 export async function addAssistantMessage(
   chatId: string,
   reply: Reply,
-  run?: { runId: string; runIndex: number; chosen?: boolean },
+  opts?: {
+    /** Группа сравнения: один вопрос → несколько моделей, сиблинги с общим runId. */
+    run?: { runId: string; runIndex: number; chosen?: boolean };
+    parentId?: string | null;
+    /** Цена провайдера смотрится раньше встроенного реестра — см. costRub. */
+    provider?: Provider | null;
+  },
 ): Promise<Message> {
-  return addMessage({
-    chatId,
-    role: 'assistant',
-    content: reply.content,
-    model: reply.model,
-    tokensIn: reply.usage.in,
-    tokensOut: reply.usage.out,
-    costRub: costRub(reply.model, reply.usage.in, reply.usage.out),
-    status: 'done',
-    error: null,
-    runId: run?.runId ?? null,
-    runIndex: run?.runIndex ?? 0,
-    chosen: run?.chosen ?? false,
-    reasoning: reply.reasoning || undefined,
-  });
+  // Лист сдвигаем только для представителя прогона (runIndex 0) либо для
+  // одиночного ответа — остальные колонки сравнения не должны спорить за
+  // единственный указатель активной ветки.
+  const row = await addMessage(
+    {
+      chatId,
+      role: 'assistant',
+      content: reply.content,
+      model: reply.model,
+      tokensIn: reply.usage.in,
+      tokensOut: reply.usage.out,
+      costRub: costRub(reply.model, reply.usage.in, reply.usage.out, opts?.provider),
+      status: 'done',
+      error: null,
+      runId: opts?.run?.runId ?? null,
+      runIndex: opts?.run?.runIndex ?? 0,
+      chosen: opts?.run?.chosen ?? false,
+      reasoning: reply.reasoning || undefined,
+      parentId: opts?.parentId,
+    },
+    { asActiveLeaf: !opts?.run || opts.run.runIndex === 0 },
+  );
+  return row;
 }
 
 /**
@@ -138,22 +226,28 @@ export function groupRuns(messages: Message[]): (Message | Message[])[] {
 export async function addErrorMessage(
   chatId: string,
   error: string,
-  run?: { runId: string; runIndex: number },
+  opts?: { run?: { runId: string; runIndex: number }; parentId?: string | null },
 ): Promise<Message> {
-  return addMessage({
-    chatId,
-    role: 'assistant',
-    content: '',
-    model: null,
-    tokensIn: null,
-    tokensOut: null,
-    costRub: null,
-    status: 'error',
-    error,
-    runId: run?.runId ?? null,
-    runIndex: run?.runIndex ?? 0,
-    chosen: false,
-  });
+  // Ошибка — законный лист дерева: повтор («Retry») строится от её родителя.
+  const row = await addMessage(
+    {
+      chatId,
+      role: 'assistant',
+      content: '',
+      model: null,
+      tokensIn: null,
+      tokensOut: null,
+      costRub: null,
+      status: 'error',
+      error,
+      runId: opts?.run?.runId ?? null,
+      runIndex: opts?.run?.runIndex ?? 0,
+      chosen: false,
+      parentId: opts?.parentId,
+    },
+    { asActiveLeaf: !opts?.run || opts.run.runIndex === 0 },
+  );
+  return row;
 }
 
 export async function removeMessage(id: string): Promise<void> {
@@ -161,25 +255,49 @@ export async function removeMessage(id: string): Promise<void> {
   await db.messages.update(id, { deletedAt: ts, updatedAt: ts });
 }
 
+/** Мягкое удаление целого поддерева версий с переводом активного листа чата на живое место. */
+export async function removeBranch(chat: Chat, messageId: string): Promise<void> {
+  const prevAlive = await chatMessages(chat.id);
+  const ids = subtreeIds(prevAlive, messageId);
+  const ts = now();
+  if (ids.length) {
+    await db.messages.bulkUpdate(ids.map((id) => ({ key: id, changes: { deletedAt: ts, updatedAt: ts } })));
+  }
+  const nextLeaf = leafAfterRemoval(prevAlive, messageId, chat.activeLeafId);
+  await patchChat(chat.id, { activeLeafId: nextLeaf });
+}
+
 /**
- * Контекст для отправки. Берём только успешные непустые сообщения: пустой
- * content (ошибка/отмена) провайдер отвергает с 400. Ограничение по
- * historyLimit — прямой контроль расхода: без него длинный диалог
- * оплачивается целиком на каждом вопросе.
+ * Контекст для отправки. Алгоритм:
+ * (1) path = buildPath(messages, activeLeafId) — путь от корня до активного
+ *     листа; runId-группы разворачиваются на месте представителя всеми членами;
+ * (2) фильтр: status==='done' и есть непустой content либо images (пустой
+ *     content — ошибка/отмена, провайдер отвергает такое с 400);
+ * (3) из runId-группы в контекст уходит ТОЛЬКО победитель — chosen, либо
+ *     участник с минимальным runIndex, если выбор не сделан;
+ * (4) хвост historyLimit последних сообщений (0 и меньше — без среза) —
+ *     прямой контроль расхода: без него длинный диалог оплачивается целиком
+ *     на каждом вопросе;
+ * (5) превращаем в { role, content, images } для wire-формата.
  */
-export function toContext(messages: Message[], historyLimit: number): ChatMessage[] {
-  // Из прогона сравнения в контекст уходит ТОЛЬКО один ответ — выбранный, а
-  // если выбор не сделан, первый. Иначе модель получила бы несколько разных
-  // ответов на один и тот же вопрос, а платить пришлось бы за все сразу.
+export function toContext(messages: Message[], historyLimit: number, activeLeafId?: string | null): ChatMessage[] {
+  const path = buildPath(messages, activeLeafId);
+  // Вопрос из одних картинок (без текста) валиден — content пуст, но images
+  // непусты. Ошибка/отмена — status!=='done', такое сообщение не пригодно.
+  const isUsable = (m: Message) => m.status === 'done' && (!!m.content.trim() || !!m.images?.length);
   const taken = new Set<string>();
-  const usable = messages.filter((m) => {
-    // Вопрос из одних картинок (без текста) валиден — content пуст, но
-    // images непусты.
-    if (m.status !== 'done' || (!m.content.trim() && !m.images?.length)) return false;
+  const usable = path.filter((m) => {
+    if (!isUsable(m)) return false;
     if (!m.runId) return true;
     if (taken.has(m.runId)) return false;
-    const group = messages.filter((x) => x.runId === m.runId);
-    const winner = group.find((x) => x.chosen) ?? group[0];
+    // Победитель по умолчанию ищется ТОЛЬКО среди пригодных (done, непустых)
+    // колонок группы — упавшая (error) колонка не может стать «победителем»
+    // просто из-за меньшего runIndex. Иначе, если колонка-0 падает и явный
+    // выбор (chosen) не сделан, весь раунд сравнения — включая успешные
+    // колонки — молча выпадал из контекста следующего вопроса.
+    const group = path.filter((x) => x.runId === m.runId);
+    const usableGroup = group.filter(isUsable);
+    const winner = usableGroup.find((x) => x.chosen) ?? usableGroup.reduce((min, x) => ((x.runIndex ?? 0) < (min.runIndex ?? 0) ? x : min));
     if (winner.id !== m.id) return false;
     taken.add(m.runId);
     return true;
@@ -202,8 +320,8 @@ export function exportMarkdown(chat: Chat, messages: Message[]): string {
   const head = `# ${chat.title}\n\n_${new Date(chat.createdAt).toLocaleString('ru-RU')}_\n`;
   const body = messages
     .map((m) => {
-      if (m.status === 'error') return `**Ошибка:** ${m.error ?? ''}`;
-      return m.role === 'user' ? `## Вопрос\n\n${m.content}` : `## Ответ\n\n${m.content}`;
+      if (m.status === 'error') return t('chat.errorPrefix', { error: m.error ?? '' });
+      return m.role === 'user' ? `${t('chat.questionHeading')}\n\n${m.content}` : `${t('chat.answerHeading')}\n\n${m.content}`;
     })
     .join('\n\n');
   return `${head}\n${body}\n`;

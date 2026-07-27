@@ -169,6 +169,46 @@ select {
 .animate-sheet-up { animation: sheet-up 0.25s var(--cc-ease-snap); }
 .animate-caret { animation: caret 1s steps(1, end) infinite; }
 
+/* Появление сообщений в ленте — только на монтировании (ключ = id
+   сообщения), набор текста в композере эту анимацию не задевает. */
+@keyframes cc-msg-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+.animate-msg-in { animation: cc-msg-in 150ms var(--cc-ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-msg-in,
+  .animate-fade-in,
+  .animate-sheet-up { animation: none; }
+}
+
+/* Аврора чата: два мягких пятна акцентного цвета на fixed-слое позади
+   контента. fixed + без фильтров/теней = один композитный слой, скролл ленты
+   его не трогает (ChatPage кладёт слой ПЕРЕД контент-обёрткой, а обёртке даёт
+   z-index — иначе позиционированный fixed-слой рисуется поверх статичных
+   потомков по правилам CSS-стека). */
+.cc-aurora {
+  background:
+    radial-gradient(60vw 60vw at 0% 0%, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 70%),
+    radial-gradient(50vw 50vw at 100% 100%, color-mix(in srgb, var(--app-accent) 8%, transparent), transparent 70%);
+}
+:root.light .cc-aurora {
+  /* Тот же альфа на светлом фоне читается грязнее — держим ниже. */
+  background:
+    radial-gradient(60vw 60vw at 0% 0%, color-mix(in srgb, var(--app-accent) 5%, transparent), transparent 70%),
+    radial-gradient(50vw 50vw at 100% 100%, color-mix(in srgb, var(--app-accent) 5%, transparent), transparent 70%);
+}
+
+/* Тонкие скроллбары в духе CLI: лента, nav сайдбара, списки палитры/сниппетов,
+   контейнер настроек. */
+.cc-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cc-fill-control) transparent;
+}
+.cc-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.cc-scroll::-webkit-scrollbar-thumb { background: var(--cc-fill-control); border-radius: 3px; }
+.cc-scroll::-webkit-scrollbar-track { background: transparent; }
+
 /* ── Разметка ответа ────────────────────────────────────────────────
    Моно только на машинном слое (код, счётчики, метаданные). В CLI моно всё,
    но на телефоне сплошной моноширинный текст нечитаем — это второе

@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { Sheet } from '../../components/ui/Sheet';
 import { Button } from '../../components/ui/Button';
 import type { BaseEntity, Provider } from '../../db/types';
+import { modelEntries } from '../../lib/ai/models';
+import { useT } from '../../lib/i18n';
 
 interface Props {
   open: boolean;
@@ -18,30 +21,65 @@ const PRESETS = [
   { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
 ];
 
+/** Строка редактора моделей — поля ввода как строки, приводятся к числу только при сохранении. */
+interface ModelRow {
+  id: string;
+  priceIn: string;
+  priceOut: string;
+}
+
+/** ',' — обычный десятичный разделитель на русской раскладке; NaN/0/отрицательные цены не хотим. */
+function parsePrice(raw: string): number | undefined {
+  const n = Number(raw.trim().replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 /**
  * Поля инициализируются прямо из пропсов, а сброс между открытиями делает
  * `key` на стороне вызывающего: перемонтирование вместо синхронного setState
  * в эффекте, который даёт каскадные рендеры.
  */
 export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
+  const t = useT();
   const [name, setName] = useState(provider?.name ?? '');
   const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? '');
   const [apiKey, setApiKey] = useState(provider?.apiKey ?? '');
-  const [models, setModels] = useState((provider?.models ?? []).join(', '));
+  const [rows, setRows] = useState<ModelRow[]>(() => {
+    const entries = modelEntries(provider?.models ?? []).map((m) => ({
+      id: m.id,
+      priceIn: m.priceIn !== undefined ? String(m.priceIn) : '',
+      priceOut: m.priceOut !== undefined ? String(m.priceOut) : '',
+    }));
+    return entries.length ? entries : [{ id: '', priceIn: '', priceOut: '' }];
+  });
 
-  const valid = name.trim() && baseUrl.trim() && models.trim();
+  const valid = name.trim() && baseUrl.trim() && rows.some((r) => r.id.trim());
+
+  function updateRow(i: number, patch: Partial<ModelRow>) {
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  function removeRow(i: number) {
+    setRows((rs) => (rs.length > 1 ? rs.filter((_, idx) => idx !== i) : rs));
+  }
 
   function handleSave() {
     if (!valid) return;
+    // Дубли id — оставляем первый: последующие с тем же id молча отбрасываются.
+    const seen = new Set<string>();
+    const models = rows
+      .map((r) => ({ id: r.id.trim(), priceIn: parsePrice(r.priceIn), priceOut: parsePrice(r.priceOut) }))
+      .filter((m) => {
+        if (!m.id || seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
     void onSave(
       {
         name: name.trim(),
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
-        models: models
-          .split(',')
-          .map((m) => m.trim())
-          .filter(Boolean),
+        models,
         isDemo: false,
       },
       provider?.id,
@@ -49,7 +87,7 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={provider ? 'Провайдер' : 'Новый провайдер'}>
+    <Sheet open={open} onClose={onClose} title={provider ? t('provider.titleEdit') : t('provider.titleNew')}>
       <div className="space-y-3">
         {!provider && (
           <div className="flex flex-wrap gap-1.5">
@@ -67,31 +105,73 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
             ))}
           </div>
         )}
-        <Field label="Название" value={name} onChange={setName} placeholder="Polza.ai" />
+        <Field label={t('provider.name')} value={name} onChange={setName} placeholder="Polza.ai" />
         <Field
-          label="Адрес API"
+          label={t('provider.address')}
           value={baseUrl}
           onChange={setBaseUrl}
           placeholder="https://api.polza.ai/api/v1"
-          hint="OpenAI-совместимый эндпоинт. Путь /chat/completions добавляется сам."
+          hint={t('provider.addressHint')}
         />
         <Field
-          label="Ключ"
+          label={t('provider.key')}
           value={apiKey}
           onChange={setApiKey}
           placeholder="sk-..."
           type="password"
-          hint="Хранится только на этом устройстве, уходит напрямую провайдеру."
+          hint={t('provider.keyHint')}
         />
-        <Field
-          label="Модели"
-          value={models}
-          onChange={setModels}
-          placeholder="claude-sonnet-5, gpt-5.6"
-          hint="Через запятую. Первая станет моделью по умолчанию."
-        />
+
+        <div>
+          <span className="mb-1 block text-sm font-medium">{t('provider.models')}</span>
+          <p className="mb-2 text-[var(--cc-text-caption)] leading-relaxed text-muted">{t('provider.modelsHead')}</p>
+          <div className="space-y-1.5">
+            {rows.map((row, i) => (
+              <div key={i} className="grid grid-cols-[1fr_4.5rem_4.5rem_2rem] items-center gap-1.5">
+                <input
+                  value={row.id}
+                  placeholder="gpt-5.6"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  onChange={(e) => updateRow(i, { id: e.target.value })}
+                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2.5 py-2.5 font-mono text-[var(--cc-text-body)] outline-none placeholder:text-muted"
+                />
+                <input
+                  value={row.priceIn}
+                  placeholder={t('provider.priceInPlaceholder')}
+                  inputMode="decimal"
+                  onChange={(e) => updateRow(i, { priceIn: e.target.value })}
+                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2 py-2.5 text-[var(--cc-text-body)] outline-none placeholder:text-muted"
+                />
+                <input
+                  value={row.priceOut}
+                  placeholder={t('provider.priceOutPlaceholder')}
+                  inputMode="decimal"
+                  onChange={(e) => updateRow(i, { priceOut: e.target.value })}
+                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2 py-2.5 text-[var(--cc-text-body)] outline-none placeholder:text-muted"
+                />
+                <button
+                  aria-label={t('provider.removeModelAria')}
+                  disabled={rows.length === 1}
+                  onClick={() => removeRow(i)}
+                  className="grid size-8 place-items-center text-muted active:opacity-60 disabled:opacity-25"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            className="mt-2 text-sm text-accent active:opacity-60"
+            onClick={() => setRows((rs) => [...rs, { id: '', priceIn: '', priceOut: '' }])}
+          >
+            + {t('provider.addModel')}
+          </button>
+        </div>
+
         <Button className="w-full" disabled={!valid} onClick={handleSave}>
-          Сохранить
+          {t('common.save')}
         </Button>
       </div>
     </Sheet>

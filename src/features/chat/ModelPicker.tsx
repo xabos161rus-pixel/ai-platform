@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import type { Provider } from '../../db/types';
-import { modelLabel } from '../../lib/ai/models';
+import { modelIds, modelLabel } from '../../lib/ai/models';
+import { useT } from '../../lib/i18n';
 
 interface Props {
   providers: Provider[];
@@ -16,6 +17,7 @@ interface Props {
  * нельзя уводить человека с экрана диалога.
  */
 export function ModelPicker({ providers, providerId, model, onChange }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -45,7 +47,7 @@ export function ModelPicker({ providers, providerId, model, onChange }: Props) {
         className="flex max-w-[60vw] items-center gap-1 rounded-[var(--cc-radius-sm)] px-1.5 py-0.5 font-mono text-[var(--cc-text-caption)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text"
       >
         <span className="truncate">
-          {current?.isDemo ? 'демо · без ключа' : (current?.name ?? 'нет провайдера')} · {modelLabel(model)}
+          {current?.isDemo ? t('modelpicker.demo') : (current?.name ?? t('modelpicker.noProvider'))} · {modelLabel(model)}
         </span>
         <ChevronDown size={12} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -57,7 +59,7 @@ export function ModelPicker({ providers, providerId, model, onChange }: Props) {
               <p className="px-2 pt-2 pb-1 font-mono text-[var(--cc-text-caption)] tracking-wide text-muted uppercase">
                 {p.name}
               </p>
-              {p.models.map((m) => {
+              {modelIds(p.models).map((m) => {
                 const active = p.id === providerId && m === model;
                 return (
                   <button
