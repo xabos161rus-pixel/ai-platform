@@ -626,6 +626,27 @@ body = await p.textContent('body');
 check(body.includes('test.txt'), 'файлы: чип виден в пузыре сообщения после отправки');
 check(!body.includes('секретное содержимое'), 'файлы: текст файла не рендерится в ленте (только чип)');
 
+// Word/Excel (OOXML): чип появляется только после успешного извлечения текста,
+// так что «чип виден» = ленивый чанк vendor-office подгрузился и парсер сработал.
+await p.locator('input[type=file][accept*="pdf"]').setInputFiles('scripts/fixtures/sample.docx');
+await p.waitForTimeout(2500); // первый офисный файл тянет чанк vendor-office
+check((await p.textContent('body')).includes('sample.docx'), 'файлы: .docx распарсен — чип в композере');
+await p.locator('input[type=file][accept*="pdf"]').setInputFiles('scripts/fixtures/sample.xlsx');
+await p.waitForTimeout(2000);
+check((await p.textContent('body')).includes('sample.xlsx'), 'файлы: .xlsx распарсен — чип в композере');
+
+// Старый .doc: парсить в браузере нечем — честный тост с просьбой пересохранить,
+// чип не появляется (после того как тост (2.6с) погас, имени в DOM нет).
+await p.locator('input[type=file][accept*="pdf"]').setInputFiles({
+  name: 'old.doc',
+  mimeType: 'application/msword',
+  buffer: Buffer.from('не ooxml'),
+});
+await p.waitForTimeout(400);
+check((await p.textContent('body')).includes('старый формат'), 'файлы: .doc отклонён тостом про старый формат');
+await p.waitForTimeout(2700);
+check(!(await p.textContent('body')).includes('old.doc'), 'файлы: .doc не прикрепился — чипа нет после тоста');
+
 // Настройки: раздел «Инструменты» и сохранение ключа Jina между перезагрузками.
 await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
 await p.waitForTimeout(500);

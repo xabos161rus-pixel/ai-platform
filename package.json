@@ -16,11 +16,13 @@
     "dompurify": "^3.4.9",
     "highlight.js": "^11.11.1",
     "lucide-react": "^1.17.0",
+    "mammoth": "^1.12.0",
     "marked": "^18.0.5",
     "pdfjs-dist": "^6.2.108",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router": "^7.17.0"
+    "react-router": "^7.17.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

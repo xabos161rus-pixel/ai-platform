@@ -41,6 +41,9 @@ export default defineConfig(({ command }) => ({
           // pdfjs-dist грузится лениво только при первом PDF-вложении
           // (см. lib/files.ts) — отдельным чанком, не в общем остатке.
           if (id.includes('node_modules/pdfjs-dist')) return 'vendor-pdf';
+          // mammoth (.docx) и SheetJS (.xlsx) с их зависимостями — лениво при
+          // первом офисном вложении, тем же приёмом, что vendor-pdf.
+          if (/node_modules\/(mammoth|xlsx|jszip|@xmldom|dingbat-to-unicode|lop|option|duck|underscore|base64-js|bluebird)\//.test(id)) return 'vendor-office';
         },
       },
     },

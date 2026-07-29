@@ -4,10 +4,15 @@ import { useToast } from '../../components/ui/toastContext';
 import { compressImage, MAX_IMAGES } from '../../lib/images';
 import {
   acceptAttr,
+  extractDocx,
   extractPdf,
   extractText,
+  extractXlsx,
+  isDocxFile,
+  isLegacyOffice,
   isPdfFile,
   isTextFile,
+  isXlsxFile,
   MAX_MSG_FILE_CHARS,
   type AttachedFile,
 } from '../../lib/files';
@@ -138,9 +143,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
       let attached: AttachedFile;
       try {
         if (isPdfFile(f)) attached = await extractPdf(f);
+        else if (isDocxFile(f)) attached = await extractDocx(f);
+        else if (isXlsxFile(f)) attached = await extractXlsx(f);
         else attached = await extractText(f);
       } catch (e) {
         if (e instanceof Error && e.message === 'too_big') toast(t('files.tooBig'));
+        else if (e instanceof Error && e.message === 'office_too_big') toast(t('files.officeTooBig'));
         else toast(t('files.readFailed'));
         continue;
       }
@@ -166,7 +174,13 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     const docs: File[] = [];
     for (const f of all) {
       if (f.type.startsWith('image/')) continue;
-      if (isPdfFile(f) || isTextFile(f)) docs.push(f);
+      if (isLegacyOffice(f)) {
+        // .doc/.xls/.ppt — бинарные форматы прошлого века, в браузере их
+        // парсить нечем; молча игнорировать нельзя — человек решит, что сломано.
+        toast(t('files.legacyOffice', { name: f.name }));
+        continue;
+      }
+      if (isPdfFile(f) || isDocxFile(f) || isXlsxFile(f) || isTextFile(f)) docs.push(f);
       else toast(t('files.unsupported'));
     }
     await addImages(imgs);
