@@ -51,7 +51,10 @@
 
   --cc-text-caption: 0.706rem;
   --cc-text-meta: 0.765rem;
-  --cc-text-body: 0.941rem;
+  /* Ужато с 0.941rem по живой обратной связи: на большом мониторе диалог
+     читался «огромным» рядом с плотным машинным слоем. 0.882rem × 17px ≈ 15px —
+     плотность DeepSeek/ChatGPT; мысли и метаданные остаются ступенью ниже. */
+  --cc-text-body: 0.882rem;
 
   --cc-dur-fast: 60ms;
   --cc-dur-snap: 120ms;
@@ -214,7 +217,7 @@ select {
    но на телефоне сплошной моноширинный текст нечитаем — это второе
    осознанное отступление от оригинала. */
 .cc-md {
-  line-height: 1.6;
+  line-height: 1.55;
   word-break: break-word;
   font-size: var(--cc-text-body);
 }
