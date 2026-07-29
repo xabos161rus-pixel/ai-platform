@@ -77,7 +77,7 @@ export const SnippetMenu = forwardRef<SnippetMenuHandle, Props>(function Snippet
             onClick={() => onPick(s.text)}
           >
             <span className="truncate text-sm font-medium">{s.title}</span>
-            <span className="w-full truncate font-mono text-[var(--cc-text-caption)] text-muted">
+            <span className="w-full truncate font-mono text-[length:var(--cc-text-caption)] text-muted">
               {s.text.slice(0, 60)}
             </span>
           </button>

@@ -38,6 +38,9 @@ export default defineConfig(({ command }) => ({
           }
           if (/node_modules\/(react|react-dom|react-router|scheduler)\//.test(id)) return 'vendor-react';
           if (id.includes('node_modules/highlight.js')) return 'vendor-hljs';
+          // pdfjs-dist грузится лениво только при первом PDF-вложении
+          // (см. lib/files.ts) — отдельным чанком, не в общем остатке.
+          if (id.includes('node_modules/pdfjs-dist')) return 'vendor-pdf';
         },
       },
     },

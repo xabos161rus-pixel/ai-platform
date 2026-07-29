@@ -24,7 +24,7 @@ export function CompareBar({ providers, picks, onChange }: Props) {
       <button
         onClick={() => onChange(all.slice(0, Math.min(2, all.length)).map((x) => x.key))}
         title={t('compare.tooltip')}
-        className="flex items-center gap-1.5 rounded-[var(--cc-radius-sm)] px-2 py-1 font-mono text-[var(--cc-text-caption)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text"
+        className="flex items-center gap-1.5 rounded-[var(--cc-radius-sm)] px-2 py-1 font-mono text-[length:var(--cc-text-caption)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text"
       >
         <Columns2 size={13} />
         {t('compare.button')}
@@ -34,14 +34,14 @@ export function CompareBar({ providers, picks, onChange }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="font-mono text-[var(--cc-text-caption)] text-muted">{t('compare.prefix')}</span>
+      <span className="font-mono text-[length:var(--cc-text-caption)] text-muted">{t('compare.prefix')}</span>
       {all.map((x) => {
         const on = picks.includes(x.key);
         return (
           <button
             key={x.key}
             onClick={() => onChange(on ? picks.filter((k) => k !== x.key) : [...picks, x.key])}
-            className={`rounded-full border px-2.5 py-1 font-mono text-[var(--cc-text-caption)] transition-colors ${
+            className={`rounded-full border px-2.5 py-1 font-mono text-[length:var(--cc-text-caption)] transition-colors ${
               on ? 'border-accent text-accent' : 'border-hairline text-muted hover:text-text'
             }`}
           >
@@ -57,7 +57,7 @@ export function CompareBar({ providers, picks, onChange }: Props) {
         <X size={13} />
       </button>
       {picks.length === 1 && (
-        <span className="font-mono text-[var(--cc-text-caption)] text-warning">{t('compare.needTwo')}</span>
+        <span className="font-mono text-[length:var(--cc-text-caption)] text-warning">{t('compare.needTwo')}</span>
       )}
     </div>
   );

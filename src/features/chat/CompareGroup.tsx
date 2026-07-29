@@ -46,7 +46,7 @@ export const CompareGroup = memo(function CompareGroup({ group, messages, busy, 
       </div>
       <div className="min-w-0">
         {/* Сводка: что с чем сравниваем и во сколько обошлось */}
-        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[var(--cc-text-caption)] text-muted">
+        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[length:var(--cc-text-caption)] text-muted">
           <span>{t('compare.count', { n: group.length })}</span>
           <span>
             {t('compare.total')} {formatCost(group.reduce((s, m) => s + (m.costRub ?? 0), 0))}
@@ -68,7 +68,7 @@ export const CompareGroup = memo(function CompareGroup({ group, messages, busy, 
             <button
               key={m.id}
               onClick={() => setTab(i)}
-              className={`flex-1 truncate rounded-[var(--cc-radius-sm)] px-2 py-1.5 font-mono text-[var(--cc-text-caption)] transition-colors ${
+              className={`flex-1 truncate rounded-[var(--cc-radius-sm)] px-2 py-1.5 font-mono text-[length:var(--cc-text-caption)] transition-colors ${
                 tab === i ? 'bg-[var(--cc-fill-control)] text-text' : 'text-muted'
               }`}
             >
@@ -87,10 +87,10 @@ export const CompareGroup = memo(function CompareGroup({ group, messages, busy, 
               }`}
             >
               <header className="mb-2 flex items-center gap-2 border-b border-hairline pb-2">
-                <span className="min-w-0 flex-1 truncate font-mono text-[var(--cc-text-caption)] text-muted">
+                <span className="min-w-0 flex-1 truncate font-mono text-[length:var(--cc-text-caption)] text-muted">
                   {modelLabel(m.model)}
                 </span>
-                <span className="shrink-0 font-mono text-[var(--cc-text-caption)] text-muted">
+                <span className="shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">
                   {formatCost(m.costRub)}
                 </span>
               </header>
@@ -104,7 +104,7 @@ export const CompareGroup = memo(function CompareGroup({ group, messages, busy, 
                 </>
               )}
 
-              <footer className="mt-2 flex items-center gap-2 border-t border-hairline pt-2 font-mono text-[var(--cc-text-caption)] text-muted">
+              <footer className="mt-2 flex items-center gap-2 border-t border-hairline pt-2 font-mono text-[length:var(--cc-text-caption)] text-muted">
                 <span className="flex-1">
                   {m.tokensIn}→{m.tokensOut}
                 </span>

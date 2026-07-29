@@ -1,10 +1,11 @@
 import { db } from '../../db/db';
 import { alive, now, stamp, uid } from '../repo';
-import type { BaseEntity, Chat, Message, Provider } from '../../db/types';
+import type { BaseEntity, Chat, Message, Provider, ToolStep } from '../../db/types';
 import { costRub } from './models';
 import type { ChatMessage, Reply } from './client';
 import { buildPath, leafAfterRemoval, nodeOf, parentMap, subtreeIds } from './tree';
 import { t } from '../i18n';
+import type { AttachedFile } from '../files';
 
 /** Заголовок чата из первого вопроса — короткая первая строка без хвостов. */
 export function autoTitle(text: string): string {
@@ -83,25 +84,30 @@ async function addMessage(
 }
 
 /**
- * @param parentId Явный родитель нового сообщения. Не передан — вычисляется
- * от текущего активного листа чата: новое сообщение продолжает ту ветку, на
- * которую сейчас смотрит чат (обычный случай отправки вопроса).
+ * @param opts.parentId Явный родитель нового сообщения. Не передан —
+ * вычисляется от текущего активного листа чата: новое сообщение продолжает
+ * ту ветку, на которую сейчас смотрит чат (обычный случай отправки вопроса).
+ * Три позиционных опциональных параметра (images/parentId/files) стали
+ * нечитаемыми на месте вызова — отсюда объект.
  */
 export async function addUserMessage(
   chat: Chat,
   content: string,
-  images?: string[],
-  parentId?: string | null,
+  opts?: { images?: string[]; parentId?: string | null; files?: AttachedFile[] },
 ): Promise<Message> {
   // Первый вопрос даёт чату имя — руками переименовывать не нужно. Вопрос из
-  // одних картинок (без текста) тоже достоин заголовка, а не пустой строки.
-  // Проверяем и '', и legacy-сентинел 'Новый чат' — старые чаты писали его
-  // прямо в данные до этой задачи.
+  // одних картинок или файлов (без текста) тоже достоин заголовка, а не
+  // пустой строки. Проверяем и '', и legacy-сентинел 'Новый чат' — старые
+  // чаты писали его прямо в данные до этой задачи.
   if (chat.title === '' || chat.title === 'Новый чат') {
-    const title = !content.trim() && images?.length ? t('chat.imageTitle') : autoTitle(content);
+    const title = !content.trim() && opts?.images?.length
+      ? t('chat.imageTitle')
+      : !content.trim() && opts?.files?.length
+        ? autoTitle(opts.files[0].name)
+        : autoTitle(content);
     await patchChat(chat.id, { title });
   }
-  let effectiveParentId = parentId;
+  let effectiveParentId = opts?.parentId;
   if (effectiveParentId === undefined) {
     const liveMsgs = await chatMessages(chat.id);
     const path = buildPath(liveMsgs, chat.activeLeafId);
@@ -119,7 +125,9 @@ export async function addUserMessage(
       costRub: null,
       status: 'done',
       error: null,
-      images: images?.length ? images : undefined,
+      images: opts?.images?.length ? opts.images : undefined,
+      files: opts?.files?.length ? opts.files.map((f) => ({ name: f.name, size: f.size, textChars: f.text.length })) : undefined,
+      fileTexts: opts?.files?.length ? opts.files.map((f) => f.text) : undefined,
       parentId: effectiveParentId,
     },
     { asActiveLeaf: true },
@@ -147,6 +155,8 @@ export async function editUserMessage(chat: Chat, original: Message, content: st
       status: 'done',
       error: null,
       images: original.images,
+      files: original.files,
+      fileTexts: original.fileTexts,
       parentId,
     },
     { asActiveLeaf: true },
@@ -163,6 +173,8 @@ export async function addAssistantMessage(
     parentId?: string | null;
     /** Цена провайдера смотрится раньше встроенного реестра — см. costRub. */
     provider?: Provider | null;
+    /** Трейс агентского цикла (шаги инструментов) — только для отображения, в wire не уходит. */
+    toolTrace?: ToolStep[];
   },
 ): Promise<Message> {
   // Лист сдвигаем только для представителя прогона (runIndex 0) либо для
@@ -184,6 +196,7 @@ export async function addAssistantMessage(
       chosen: opts?.run?.chosen ?? false,
       reasoning: reply.reasoning || undefined,
       parentId: opts?.parentId,
+      toolTrace: opts?.toolTrace?.length ? opts.toolTrace : undefined,
     },
     { asActiveLeaf: !opts?.run || opts.run.runIndex === 0 },
   );
@@ -226,7 +239,12 @@ export function groupRuns(messages: Message[]): (Message | Message[])[] {
 export async function addErrorMessage(
   chatId: string,
   error: string,
-  opts?: { run?: { runId: string; runIndex: number }; parentId?: string | null },
+  opts?: {
+    run?: { runId: string; runIndex: number };
+    parentId?: string | null;
+    /** Трейс шагов агентского цикла, уже выполненных до падения раунда — не теряем их вместе с ошибкой. */
+    toolTrace?: ToolStep[];
+  },
 ): Promise<Message> {
   // Ошибка — законный лист дерева: повтор («Retry») строится от её родителя.
   const row = await addMessage(
@@ -244,6 +262,7 @@ export async function addErrorMessage(
       runIndex: opts?.run?.runIndex ?? 0,
       chosen: false,
       parentId: opts?.parentId,
+      toolTrace: opts?.toolTrace?.length ? opts.toolTrace : undefined,
     },
     { asActiveLeaf: !opts?.run || opts.run.runIndex === 0 },
   );
@@ -271,20 +290,23 @@ export async function removeBranch(chat: Chat, messageId: string): Promise<void>
  * Контекст для отправки. Алгоритм:
  * (1) path = buildPath(messages, activeLeafId) — путь от корня до активного
  *     листа; runId-группы разворачиваются на месте представителя всеми членами;
- * (2) фильтр: status==='done' и есть непустой content либо images (пустой
- *     content — ошибка/отмена, провайдер отвергает такое с 400);
+ * (2) фильтр: status==='done' и есть непустой content либо images либо files
+ *     (пустой content без вложений — ошибка/отмена, провайдер отвергает
+ *     такое с 400);
  * (3) из runId-группы в контекст уходит ТОЛЬКО победитель — chosen, либо
  *     участник с минимальным runIndex, если выбор не сделан;
  * (4) хвост historyLimit последних сообщений (0 и меньше — без среза) —
  *     прямой контроль расхода: без него длинный диалог оплачивается целиком
  *     на каждом вопросе;
- * (5) превращаем в { role, content, images } для wire-формата.
+ * (5) превращаем в { role, content, images } для wire-формата: текст файлов
+ *     (fileTexts) вклеивается в content блоками <file name="…">…</file>,
+ *     сам wire-формат новому полю не обучается.
  */
 export function toContext(messages: Message[], historyLimit: number, activeLeafId?: string | null): ChatMessage[] {
   const path = buildPath(messages, activeLeafId);
-  // Вопрос из одних картинок (без текста) валиден — content пуст, но images
-  // непусты. Ошибка/отмена — status!=='done', такое сообщение не пригодно.
-  const isUsable = (m: Message) => m.status === 'done' && (!!m.content.trim() || !!m.images?.length);
+  // Вопрос из одних картинок или файлов (без текста) валиден — content пуст,
+  // но images/files непусты. Ошибка/отмена — status!=='done', не пригодно.
+  const isUsable = (m: Message) => m.status === 'done' && (!!m.content.trim() || !!m.images?.length || !!m.files?.length);
   const taken = new Set<string>();
   const usable = path.filter((m) => {
     if (!isUsable(m)) return false;
@@ -303,7 +325,13 @@ export function toContext(messages: Message[], historyLimit: number, activeLeafI
     return true;
   });
   const tail = historyLimit > 0 ? usable.slice(-historyLimit) : usable;
-  return tail.map((m) => ({ role: m.role, content: m.content, images: m.images }));
+  return tail.map((m) => {
+    const blocks = m.files?.length && m.fileTexts
+      ? m.files.map((f, i) => `<file name="${f.name}">\n${m.fileTexts?.[i] ?? ''}\n</file>`).join('\n\n')
+      : '';
+    const content = blocks ? (m.content.trim() ? `${m.content}\n\n${blocks}` : blocks) : m.content;
+    return { role: m.role, content, images: m.images };
+  });
 }
 
 /** Список уникальных папок среди живых чатов — папка без единого чата исчезает сама. */

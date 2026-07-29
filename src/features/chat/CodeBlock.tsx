@@ -85,7 +85,7 @@ export function CodeBlock({ lang, code }: { lang: string; code: string }) {
   return (
     <div className="overflow-hidden rounded-[var(--cc-radius)] border border-hairline bg-[var(--cc-code-bg)]">
       <div className="flex items-center justify-between gap-2 border-b border-hairline px-3 py-1">
-        <span className="font-mono text-[var(--cc-text-caption)] tracking-wide text-muted uppercase">
+        <span className="font-mono text-[length:var(--cc-text-caption)] tracking-wide text-muted uppercase">
           {lang || 'text'}
         </span>
         <div className="flex items-center gap-0.5">
@@ -148,7 +148,7 @@ export function CodeBlock({ lang, code }: { lang: string; code: string }) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-3 py-2">
-                <span className="font-mono text-[var(--cc-text-caption)] tracking-wide text-muted uppercase">
+                <span className="font-mono text-[length:var(--cc-text-caption)] tracking-wide text-muted uppercase">
                   {lang || 'text'}
                 </span>
                 <button aria-label={t('common.close')} className={HEADER_BTN} onClick={() => setFullscreen(false)}>

@@ -13,13 +13,13 @@ export function ReasoningBlock({ text }: { text: string }) {
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 font-mono text-[var(--cc-text-caption)] text-muted transition-colors hover:text-text active:opacity-60"
+        className="flex items-center gap-1 font-mono text-[length:var(--cc-text-caption)] text-muted transition-colors hover:text-text active:opacity-60"
       >
         <ChevronRight size={12} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
         {t('reasoning.label')}
       </button>
       {open && (
-        <div className="mt-1 mb-2 border-l-2 border-hairline pl-3 font-mono text-[var(--cc-text-meta)] whitespace-pre-wrap text-muted">
+        <div className="mt-1 mb-2 border-l-2 border-hairline pl-3 font-mono text-[length:var(--cc-text-meta)] whitespace-pre-wrap text-muted">
           {text}
         </div>
       )}
@@ -32,8 +32,8 @@ export function LiveReasoning({ text }: { text: string }) {
   const t = useT();
   return (
     <div>
-      <p className="flex items-center gap-1 font-mono text-[var(--cc-text-caption)] text-muted">{t('reasoning.label')}</p>
-      <div className="mt-1 border-l-2 border-hairline pl-3 font-mono text-[var(--cc-text-meta)] whitespace-pre-wrap text-muted">
+      <p className="flex items-center gap-1 font-mono text-[length:var(--cc-text-caption)] text-muted">{t('reasoning.label')}</p>
+      <div className="mt-1 border-l-2 border-hairline pl-3 font-mono text-[length:var(--cc-text-meta)] whitespace-pre-wrap text-muted">
         {text}
       </div>
     </div>

@@ -32,7 +32,7 @@ export function ShortcutsSheet({ open, onClose }: Props) {
               {row.keys.map((k, i) => (
                 <span key={i} className="flex items-center gap-1">
                   {i > 0 && <span className="text-muted">/</span>}
-                  <kbd className="rounded-[var(--cc-radius-sm)] bg-surface-2 px-1.5 py-0.5 font-mono text-[var(--cc-text-caption)]">
+                  <kbd className="rounded-[var(--cc-radius-sm)] bg-surface-2 px-1.5 py-0.5 font-mono text-[length:var(--cc-text-caption)]">
                     {k}
                   </kbd>
                 </span>

@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router';
 import {
   Copy,
   Download,
+  FileText,
   PanelLeft,
   Pencil,
   RotateCcw,
@@ -13,9 +14,11 @@ import {
   Trash2,
 } from 'lucide-react';
 import { db } from '../../db/db';
-import type { Message, Provider } from '../../db/types';
+import type { Message, Provider, ToolStep } from '../../db/types';
 import { useToast } from '../../components/ui/toastContext';
-import { streamChat, errorText } from '../../lib/ai/client';
+import { streamChat, errorText, type Reply } from '../../lib/ai/client';
+import { runAgent, RESEARCH_SYSTEM } from '../../lib/ai/agentLoop';
+import { buildTools } from '../../lib/ai/tools';
 import { formatCost, modelIds, modelLabel } from '../../lib/ai/models';
 import {
   addAssistantMessage,
@@ -32,8 +35,10 @@ import {
 } from '../../lib/ai/chatRepo';
 import { buildPath, nodeOf, parentMap } from '../../lib/ai/tree';
 import { useT } from '../../lib/i18n';
+import type { AttachedFile } from '../../lib/files';
 import { Markdown } from './Markdown';
 import { LiveReasoning, ReasoningBlock } from './ReasoningBlock';
+import { ToolTrace } from './ToolTrace';
 import { Sidebar } from './Sidebar';
 import { ModelPicker } from './ModelPicker';
 import { CompareGroup } from './CompareGroup';
@@ -81,6 +86,9 @@ export function ChatPage() {
   // Мысли модели во время генерации — отдельно от текста ответа, тоже вне
   // Dexie, по той же причине (частота обновлений).
   const [streamThink, setStreamThink] = useState('');
+  // Живые шаги агентского цикла (toolMode!=='off') — тоже вне Dexie, пишутся
+  // в итоговый Message.toolTrace одной записью только в конце прогона.
+  const [agentSteps, setAgentSteps] = useState<ToolStep[]>([]);
   // Потоки колонок сравнения: индекс колонки → накопленный текст.
   const [compareStream, setCompareStream] = useState<Record<number, string>>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -123,6 +131,7 @@ export function ChatPage() {
   // пересоздавались бы на каждый такой чих и рвали React.memo у сообщений
   // ленты ниже — они получают ask через handleRegenerate/handleSubmitEdit.
   const historyLimit = settings?.historyLimit ?? 20;
+  const jinaKey = settings?.jinaKey;
   const hasSettings = !!settings;
 
   useEffect(() => {
@@ -153,13 +162,16 @@ export function ChatPage() {
       setBusy(true);
       setStreamText('');
       setStreamThink('');
+      setAgentSteps([]);
       const ac = new AbortController();
       abortRef.current = ac;
       // Накопленный текст держим в замыкании, а не в ref: он нужен и для
       // отрисовки, и в обработчике остановки, а ref пришлось бы обновлять
-      // во время рендера.
+      // во время рендера. Шаги агентского цикла — по той же причине: ветка
+      // aborted должна сохранить трейс, не читая React state.
       let partial = '';
       let think = '';
+      let stepsAcc: ToolStep[] = [];
       // Свежий чат из БД: activeLeafId мог только что смениться (правка,
       // переключение версии) прямо перед вызовом — chat из useLiveQuery мог
       // ещё не перечитаться.
@@ -168,48 +180,90 @@ export function ChatPage() {
       const useModel = opts?.model ?? chat.model;
       const useProviderId = opts?.providerId ?? chat.providerId;
       const useProvider = providers.find((p) => p.id === useProviderId) ?? null;
+      const toolMode = chat.toolMode ?? 'off';
       try {
         const history = toContext(await chatMessages(chat.id), historyLimit, leafId);
-        const reply = await streamChat({
-          provider: useProvider,
-          messages: history,
-          systemPrompt: chat.systemPrompt,
-          model: useModel,
-          signal: ac.signal,
-          temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
-          maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
-          onDelta: (piece) => {
-            partial += piece;
-            setStreamText(partial);
-          },
-          onReasoning: (piece) => {
-            think += piece;
-            setStreamThink(think);
-          },
-        });
-        await addAssistantMessage(chat.id, reply, { parentId: leafId ?? null, provider: useProvider });
+        const onDelta = (piece: string) => {
+          partial += piece;
+          setStreamText(partial);
+        };
+        const onReasoning = (piece: string) => {
+          think += piece;
+          setStreamThink(think);
+        };
+        let reply: Reply & { toolTrace?: ToolStep[] };
+        if (toolMode === 'off') {
+          // Путь без инструментов — byte-в-byte прежний streamChat, ничего не меняем.
+          reply = await streamChat({
+            provider: useProvider,
+            messages: history,
+            systemPrompt: chat.systemPrompt,
+            model: useModel,
+            signal: ac.signal,
+            temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+            maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
+            onDelta,
+            onReasoning,
+          });
+        } else {
+          const tools = buildTools({ jinaKey });
+          reply = await runAgent({
+            provider: useProvider,
+            messages: history,
+            systemPrompt:
+              toolMode === 'research' ? `${chat.systemPrompt ? `${chat.systemPrompt}\n\n` : ''}${RESEARCH_SYSTEM}` : chat.systemPrompt,
+            model: useModel,
+            tools,
+            maxSteps: toolMode === 'research' ? 12 : 8,
+            jinaKey,
+            signal: ac.signal,
+            temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+            maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
+            onDelta,
+            onReasoning,
+            onStep: (step) => {
+              const i = stepsAcc.findIndex((s) => s.id === step.id);
+              stepsAcc = i < 0 ? [...stepsAcc, step] : stepsAcc.map((s, idx) => (idx === i ? step : s));
+              setAgentSteps(stepsAcc);
+            },
+            onToolsUnsupported: () => toast(t('agent.toolsUnsupported')),
+          });
+        }
+        await addAssistantMessage(chat.id, reply, { parentId: leafId ?? null, provider: useProvider, toolTrace: reply.toolTrace });
       } catch (e) {
         // Прерванный ответ не выбрасываем: сохраняем то, что успело прийти —
         // иначе человек теряет полезный текст из-за случайного «стоп».
         // Частичные мысли не сохраняем: недописанные мысли не несут ценности
         // и усложняют ветку аборта.
         if ((e as { code?: string })?.code === 'aborted' && partial.trim()) {
+          // Незавершённые шаги на момент остановки — законный error, не «running» навсегда.
+          const abortedSteps = stepsAcc.map((s) =>
+            s.status === 'running' ? { ...s, status: 'error' as const, result: t('agent.stepAborted') } : s,
+          );
           await addAssistantMessage(
             chat.id,
             { content: `${partial}\n\n${t('chat.stoppedNote')}`, model: useModel, usage: { in: 0, out: 0 } },
-            { parentId: leafId ?? null },
+            { parentId: leafId ?? null, toolTrace: abortedSteps },
           );
         } else {
-          await addErrorMessage(chat.id, errorText(e), { parentId: leafId ?? null });
+          // Раунд мог упасть уже после успешных tool-вызовов (web_search/read_page
+          // видны в живом трейсе) — не даём им бесследно исчезнуть вместе с ошибкой.
+          // Незавершённый (running) шаг на момент падения — законный error, не
+          // «навсегда running», аналогично ветке partial-текста выше.
+          const errorSteps = stepsAcc.map((s) =>
+            s.status === 'running' ? { ...s, status: 'error' as const, result: t('agent.stepInterrupted') } : s,
+          );
+          await addErrorMessage(chat.id, errorText(e), { parentId: leafId ?? null, toolTrace: errorSteps });
         }
       } finally {
         abortRef.current = null;
         setStreamText('');
         setStreamThink('');
+        setAgentSteps([]);
         setBusy(false);
       }
     },
-    [chat, hasSettings, historyLimit, providers, t],
+    [chat, hasSettings, historyLimit, providers, jinaKey, toast, t],
   );
 
   /**
@@ -268,11 +322,14 @@ export function ChatPage() {
     [chat, hasSettings, historyLimit, providers],
   );
 
-  /** Отправка из композера: черновик и картинки уже очищены им самим. */
-  async function handleSend(text: string, images: string[]) {
+  /** Отправка из композера: черновик, картинки и файлы уже очищены им самим. */
+  async function handleSend(text: string, images: string[], files: AttachedFile[]) {
     if (!chat) return;
     atBottom.current = true;
-    const msg = await addUserMessage(chat, text, images.length ? images : undefined);
+    const msg = await addUserMessage(chat, text, {
+      images: images.length ? images : undefined,
+      files: files.length ? files : undefined,
+    });
     if (comparePicks.length > 1) await askCompare(comparePicks, { leafId: msg.id });
     else await ask({ leafId: msg.id });
     composerRef.current?.focus();
@@ -295,7 +352,7 @@ export function ChatPage() {
     async (message: Message, text: string) => {
       if (!chat) return;
       const trimmed = text.trim();
-      if (!trimmed && !message.images?.length) return;
+      if (!trimmed && !message.images?.length && !message.files?.length) return;
       setEditingId(null);
       const msg = await editUserMessage(chat, message, trimmed);
       await ask({ leafId: msg.id });
@@ -588,7 +645,7 @@ export function ChatPage() {
               (comparePicks.length > 1 ? (
                 <StreamingCompare picks={comparePicks} texts={compareStream} />
               ) : (
-                <Streaming text={streamText} think={streamThink} />
+                <Streaming text={streamText} think={streamThink} steps={agentSteps} />
               ))}
             <div ref={bottomRef} />
           </div>
@@ -610,6 +667,8 @@ export function ChatPage() {
           onSend={handleSend}
           onStop={() => abortRef.current?.abort()}
           onEditLast={handleEditLast}
+          toolMode={chat?.toolMode ?? 'off'}
+          onToolMode={(m) => chat && void patchChat(chat.id, { toolMode: m })}
         />
         </div>
       </div>
@@ -735,7 +794,7 @@ const UserBubble = memo(function UserBubble({
 
   return (
     <div className="group animate-msg-in flex flex-col items-end">
-      <div className="max-w-[85%] rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-[var(--cc-text-body)] whitespace-pre-wrap">
+      <div className="max-w-[85%] rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-[length:var(--cc-text-body)] whitespace-pre-wrap">
         {message.images?.length ? (
           <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
             {message.images.map((src, i) => (
@@ -749,9 +808,23 @@ const UserBubble = memo(function UserBubble({
             ))}
           </div>
         ) : null}
+        {message.files?.length ? (
+          <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
+            {message.files.map((f, i) => (
+              <span
+                key={i}
+                className="flex items-center gap-1.5 rounded-[var(--cc-radius-sm)] border border-hairline bg-surface-2 px-2 py-1 text-[length:var(--cc-text-caption)]"
+              >
+                <FileText size={13} className="shrink-0 text-muted" />
+                <span className="max-w-[10rem] truncate">{f.name}</span>
+                <span className="shrink-0 text-muted">{t('files.chars', { n: f.textChars })}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
         {message.content ? message.content : null}
       </div>
-      <div className="mt-1 flex items-center gap-2 font-mono text-[var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
+      <div className="mt-1 flex items-center gap-2 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
         <button
           aria-label={t('msg.edit')}
           disabled={busy}
@@ -828,7 +901,7 @@ function EditBox({
           </button>
           <button
             className="rounded-[var(--cc-radius-sm)] bg-accent px-3 py-1.5 text-sm text-white active:opacity-80 disabled:opacity-40"
-            disabled={!text.trim() && !message.images?.length}
+            disabled={!text.trim() && !message.images?.length && !message.files?.length}
             onClick={() => onSubmit(text)}
           >
             {t('common.send')}
@@ -884,11 +957,12 @@ const AssistantBlock = memo(function AssistantBlock({
           <p className="text-sm text-danger">{message.error}</p>
         ) : (
           <>
+            {message.toolTrace?.length ? <ToolTrace steps={message.toolTrace} /> : null}
             {message.reasoning && <ReasoningBlock text={message.reasoning} />}
             <Markdown text={message.content} />
           </>
         )}
-        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
+        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
           {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
             <span>
               {message.tokensIn}→{message.tokensOut}
@@ -949,14 +1023,14 @@ function StreamingCompare({
         <span className="block size-1.5 animate-pulse rounded-full bg-accent" />
       </div>
       <div className="min-w-0">
-        <p className="mb-2 font-mono text-[var(--cc-text-caption)] text-muted">{t('compare.count', { n: picks.length })}</p>
+        <p className="mb-2 font-mono text-[length:var(--cc-text-caption)] text-muted">{t('compare.count', { n: picks.length })}</p>
         <div
           className="space-y-2 lg:grid lg:gap-3 lg:space-y-0"
           style={{ gridTemplateColumns: `repeat(${picks.length}, minmax(0, 1fr))` }}
         >
           {picks.map((pick, i) => (
             <article key={`${pick.providerId}:${pick.model}`} className="rounded-[var(--cc-radius)] border border-hairline p-3">
-              <header className="mb-2 border-b border-hairline pb-2 font-mono text-[var(--cc-text-caption)] text-muted">
+              <header className="mb-2 border-b border-hairline pb-2 font-mono text-[length:var(--cc-text-caption)] text-muted">
                 {modelLabel(pick.model)}
               </header>
               {texts[i] ? (
@@ -965,7 +1039,7 @@ function StreamingCompare({
                   <span className="animate-caret -mt-1 inline-block text-accent">▍</span>
                 </>
               ) : (
-                <p className="font-mono text-[var(--cc-text-caption)] text-muted">
+                <p className="font-mono text-[length:var(--cc-text-caption)] text-muted">
                   {t('compare.waiting')}
                   <span className="animate-caret">▍</span>
                 </p>
@@ -979,7 +1053,7 @@ function StreamingCompare({
 }
 
 /** Ответ во время генерации: тот же рендер, что и у готового, плюс каретка. */
-function Streaming({ text, think }: { text: string; think: string }) {
+function Streaming({ text, think, steps }: { text: string; think: string; steps: ToolStep[] }) {
   const t = useT();
   return (
     <div className="grid grid-cols-[var(--cc-marker-col)_1fr]">
@@ -987,14 +1061,15 @@ function Streaming({ text, think }: { text: string; think: string }) {
         <span className="block size-1.5 animate-pulse rounded-full bg-accent" />
       </div>
       <div className="min-w-0">
+        {steps.length > 0 && <ToolTrace steps={steps} live />}
         {think && <LiveReasoning text={think} />}
         {text ? (
           <>
             <Markdown text={text} />
             <span className="animate-caret -mt-1 inline-block text-accent">▍</span>
           </>
-        ) : !think ? (
-          <p className="font-mono text-[var(--cc-text-meta)] text-muted">
+        ) : !think && !steps.some((s) => s.status === 'running') ? (
+          <p className="font-mono text-[length:var(--cc-text-meta)] text-muted">
             {t('chat.thinking')}
             <span className="animate-caret">▍</span>
           </p>

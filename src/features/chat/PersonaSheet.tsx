@@ -62,12 +62,12 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
   return (
     <Sheet open={open} onClose={onClose} title={t('persona.title')}>
       <div className="space-y-4">
-        <p className="text-muted text-[var(--cc-text-meta)] leading-relaxed">{t('persona.description')}</p>
+        <p className="text-muted text-[length:var(--cc-text-meta)] leading-relaxed">{t('persona.description')}</p>
 
         {/* border-accent/50, не /40: на светлой теме элевейтед-фон белый, и более
             бледная граница у чипа сливалась с ним по краям скругления. */}
         {roleName && (
-          <span className="border-accent/50 text-accent inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[var(--cc-text-caption)]">
+          <span className="border-accent/50 text-accent inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[length:var(--cc-text-caption)]">
             {t('persona.roleChip', { name: roleName })}
           </span>
         )}
@@ -102,10 +102,10 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
                   }}
                 >
                   <span className="block truncate text-sm font-medium">{p.name}</span>
-                  <span className="block truncate text-[var(--cc-text-caption)] text-muted">{p.prompt}</span>
+                  <span className="block truncate text-[length:var(--cc-text-caption)] text-muted">{p.prompt}</span>
                 </button>
                 {p.builtin ? (
-                  <span className="shrink-0 font-mono text-[var(--cc-text-caption)] text-muted">{t('persona.builtin')}</span>
+                  <span className="shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">{t('persona.builtin')}</span>
                 ) : (
                   <button aria-label={t('persona.deleteRoleAria')} className="shrink-0 p-1 active:opacity-60" onClick={() => void handleDelete(p)}>
                     <Trash2 size={15} />
@@ -123,7 +123,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{t('params.temperature')}</span>
               <div className="flex items-center gap-2">
-                <span className={`font-mono text-[var(--cc-text-caption)] ${temperature === null ? 'text-muted' : ''}`}>
+                <span className={`font-mono text-[length:var(--cc-text-caption)] ${temperature === null ? 'text-muted' : ''}`}>
                   {temperature === null ? t('params.default') : temperature.toFixed(1)}
                 </span>
                 <button
@@ -166,7 +166,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
               }}
               className="w-full rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 text-base outline-none placeholder:text-muted focus:shadow-[0_0_0_1px_var(--app-accent)]"
             />
-            <span className="mt-1 block text-[var(--cc-text-caption)] leading-relaxed text-muted">
+            <span className="mt-1 block text-[length:var(--cc-text-caption)] leading-relaxed text-muted">
               {t('params.maxTokensHint')}
             </span>
           </label>

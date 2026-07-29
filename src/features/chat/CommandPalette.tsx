@@ -196,7 +196,7 @@ function Palette({
               >
                 <Icon size={15} className="shrink-0 text-muted" />
                 <span className="min-w-0 flex-1 truncate text-sm">{c.label}</span>
-                {c.hint && <span className="shrink-0 font-mono text-[var(--cc-text-caption)] text-muted">{c.hint}</span>}
+                {c.hint && <span className="shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">{c.hint}</span>}
                 {i === cursor && <CornerDownLeft size={13} className="shrink-0 text-muted" />}
               </button>
             );

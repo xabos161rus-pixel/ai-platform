@@ -22,7 +22,32 @@ export interface Reply {
   model: string;
   usage: Usage;
   reasoning?: string;
+  toolCalls?: ToolCallReq[];
+  finishReason?: string;
 }
+
+/** Вызов инструмента, запрошенный моделью. arguments — сырой JSON-текст (может быть битым — парсит вызывающий). */
+export interface ToolCallReq {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+/** Описание инструмента в wire-формате OpenAI-совместимого API (поле tools в теле запроса). */
+export type WireTool = { type: 'function'; function: { name: string; description: string; parameters: object } };
+
+/**
+ * Готовые wire-сообщения агентского цикла (ответ модели с tool_calls и результаты
+ * инструментов). agentLoop добавляет их ПОСЛЕ toWire(messages) как есть — toWire
+ * новым ролям не обучаем, история цикла с обычными сообщениями не пересекается.
+ */
+export type WireAgentMsg =
+  | {
+      role: 'assistant';
+      content: string | null;
+      tool_calls: { id: string; type: 'function'; function: { name: string; arguments: string } }[];
+    }
+  | { role: 'tool'; tool_call_id: string; content: string };
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -105,23 +130,30 @@ function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-
   const last = messages[messages.length - 1];
   const imgs = last.images?.length ?? 0;
   const ru = getLang() === 'ru';
+  // toContext вклеивает текст файлов в content блоками <file name="…">…</file>
+  // (см. lib/ai/chatRepo.ts) — реальная модель должна их видеть, но демо-эхо
+  // не должно дословно печатать содержимое чужого файла обратно в ленту:
+  // обрезаем цитату вопроса ДО первого такого блока, если он есть.
+  const hasFileBlock = /<file name="/.test(last.content);
+  const questionText = hasFileBlock ? last.content.split(/<file name="/)[0].trimEnd() : last.content;
   if (model === 'demo-fast') {
     const lines = ru
       ? [
           '**Демо · краткий.** Вторая модель отвечает иначе — так видно смысл сравнения.',
           '',
-          `Вопрос: «${last.content.slice(0, 120)}»`,
+          `Вопрос: «${questionText.slice(0, 120)}»`,
           '',
           `Сообщений в контексте: ${messages.length}`,
         ]
       : [
           "**Demo · brief.** The second model answers differently — that's the point of comparison.",
           '',
-          `Question: "${last.content.slice(0, 120)}"`,
+          `Question: "${questionText.slice(0, 120)}"`,
           '',
           `Messages in context: ${messages.length}`,
         ];
     if (imgs > 0) lines.push('', ru ? `Изображений: ${imgs}` : `Images: ${imgs}`);
+    if (hasFileBlock) lines.push('', ru ? 'К вопросу приложен файл.' : 'A file is attached to the question.');
     const short = lines.join('\n');
     // demo-fast намеренно не шлёт reasoning — живой пример модели без мыслей.
     return { content: short, model, usage: { in: estimateTokens(last.content), out: estimateTokens(short) } };
@@ -132,7 +164,7 @@ function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-
         '',
         'Ваш вопрос:',
         '',
-        `> ${last.content.slice(0, 500).replace(/\n/g, '\n> ')}`,
+        `> ${questionText.slice(0, 500).replace(/\n/g, '\n> ')}`,
         '',
         `Сообщений в контексте: ${messages.length}${systemPrompt ? ' · системный промпт задан' : ''}`,
       ]
@@ -141,11 +173,19 @@ function demoReply(messages: ChatMessage[], systemPrompt: string, model = 'demo-
         '',
         'Your question:',
         '',
-        `> ${last.content.slice(0, 500).replace(/\n/g, '\n> ')}`,
+        `> ${questionText.slice(0, 500).replace(/\n/g, '\n> ')}`,
         '',
         `Messages in context: ${messages.length}${systemPrompt ? ' · system prompt set' : ''}`,
       ];
   if (imgs > 0) lines.push('', ru ? `Вижу изображений: ${imgs}.` : `I see images: ${imgs}.`);
+  if (hasFileBlock) {
+    lines.push(
+      '',
+      ru
+        ? 'К вопросу приложен файл — в демо-режиме его содержимое не пересказывается.'
+        : 'A file is attached to the question — demo mode does not retell its contents.',
+    );
+  }
   lines.push(
     '',
     ru
@@ -201,7 +241,15 @@ interface OpenAiResponse {
 export type OnDelta = (chunk: string) => void;
 
 interface StreamChunk {
-  choices?: { delta?: { content?: string; reasoning_content?: string; reasoning?: string } }[];
+  choices?: {
+    delta?: {
+      content?: string;
+      reasoning_content?: string;
+      reasoning?: string;
+      tool_calls?: { index: number; id?: string; type?: string; function?: { name?: string; arguments?: string } }[];
+    };
+    finish_reason?: string | null;
+  }[];
   model?: string;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
@@ -217,7 +265,7 @@ async function readSse(
   res: Response,
   onDelta: OnDelta,
   onReasoning?: OnDelta,
-): Promise<{ text: string; reasoning: string; model: string; usage: Usage }> {
+): Promise<{ text: string; reasoning: string; model: string; usage: Usage; toolCalls: ToolCallReq[]; finishReason?: string }> {
   const reader = res.body?.getReader();
   if (!reader) throw new AiError('provider', t('error.noBody'));
   const decoder = new TextDecoder();
@@ -226,6 +274,11 @@ async function readSse(
   let reasoning = '';
   let model = '';
   const usage: Usage = { in: 0, out: 0 };
+  // Аккумулятор tool_calls по индексу дельты: id присваивается (провайдеры шлют
+  // его целиком в одной из дельт), name/arguments конкатенируются построчно —
+  // так приходит длинный JSON аргументов, растянутый на десятки чанков.
+  const calls: { id: string; name: string; arguments: string }[] = [];
+  let finishReason: string | undefined;
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -251,7 +304,9 @@ async function readSse(
         usage.in = Number(chunk.usage.prompt_tokens) || usage.in;
         usage.out = Number(chunk.usage.completion_tokens) || usage.out;
       }
-      const d = chunk.choices?.[0]?.delta;
+      const choice = chunk.choices?.[0];
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+      const d = choice?.delta;
       // Разные провайдеры шлют мысли в разных полях (DeepSeek/OpenRouter-стиль
       // vs остальные) — читаем оба, до обработки основного текста.
       const think = d?.reasoning_content ?? d?.reasoning;
@@ -264,9 +319,15 @@ async function readSse(
         text += piece;
         onDelta(piece);
       }
+      for (const tc of d?.tool_calls ?? []) {
+        const slot = (calls[tc.index] ??= { id: '', name: '', arguments: '' });
+        if (tc.id) slot.id = tc.id;
+        if (tc.function?.name) slot.name += tc.function.name;
+        if (tc.function?.arguments) slot.arguments += tc.function.arguments;
+      }
     }
   }
-  return { text, reasoning, model, usage };
+  return { text, reasoning, model, usage, toolCalls: calls.filter((c) => c.name), finishReason };
 }
 
 /** Разбор тела ошибки провайдера в понятный код. */
@@ -332,15 +393,19 @@ export async function streamChat(params: {
   signal?: AbortSignal;
   temperature?: number;
   maxTokens?: number;
+  /** Описания инструментов в wire-формате. Демо-путь их игнорирует — демо-цикл живёт в agentLoop. */
+  tools?: WireTool[];
+  /** Готовые wire-сообщения агентского цикла (ответы assistant с tool_calls + role:'tool'), добавляются после toWire(messages) как есть. */
+  wireTail?: WireAgentMsg[];
 }): Promise<Reply> {
-  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens } = params;
+  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, tools, wireTail } = params;
   if (!provider) throw new AiError('no_provider', t('error.noProviderInternal'));
-  // Демо-путь параметры игнорирует — заглушка не читает temperature/maxTokens.
+  // Демо-путь параметры игнорирует — заглушка не читает temperature/maxTokens/tools.
   if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal, onReasoning);
   if (!provider.apiKey) throw new AiError('no_key', t('error.noKeyInternal'));
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  const wireMessages = toWire(messages);
+  const wireMessages = [...toWire(messages), ...(wireTail ?? [])];
   let res: Response;
   try {
     res = await fetch(url, {
@@ -356,6 +421,7 @@ export async function streamChat(params: {
         stream_options: { include_usage: true },
         ...(typeof temperature === 'number' && { temperature }),
         ...(typeof maxTokens === 'number' && { max_tokens: maxTokens }),
+        ...(tools?.length && { tools }),
       }),
       signal,
     });
@@ -366,9 +432,18 @@ export async function streamChat(params: {
   if (!res.ok) throw await toAiError(res);
 
   try {
-    const { text, reasoning, model: gotModel, usage } = await readSse(res, onDelta, onReasoning);
-    if (!text.trim()) throw new AiError('provider', t('error.emptyReply'));
-    return { content: text, model: gotModel || model, usage, reasoning: reasoning.trim() ? reasoning : undefined };
+    const { text, reasoning, model: gotModel, usage, toolCalls, finishReason } = await readSse(res, onDelta, onReasoning);
+    // Пустой content допустим, если модель вместо текста вернула tool_calls —
+    // бросаем «пустой ответ» только когда нет ни текста, ни вызовов инструментов.
+    if (!text.trim() && !toolCalls.length) throw new AiError('provider', t('error.emptyReply'));
+    return {
+      content: text,
+      model: gotModel || model,
+      usage,
+      reasoning: reasoning.trim() ? reasoning : undefined,
+      toolCalls: toolCalls.length ? toolCalls : undefined,
+      finishReason,
+    };
   } catch (e) {
     if (e instanceof AiError) throw e;
     if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', t('error.abortedInternal'));

@@ -29,12 +29,25 @@ export interface Chat extends BaseEntity {
   temperature?: number | null;
   /** Лимит токенов ответа. null/отсутствие — не передавать провайдеру. */
   maxTokens?: number | null;
+  /** Режим инструментов агентского цикла. Отсутствие/null — как 'off' (без tools). */
+  toolMode?: 'off' | 'tools' | 'research' | null;
 }
 
 export type Role = 'user' | 'assistant';
 
 /** 'streaming' появится вместе с потоковым ответом (этап 2). */
 export type MessageStatus = 'done' | 'error';
+
+export type ToolStepStatus = 'running' | 'done' | 'error';
+
+/** Один шаг агентского цикла (вызов инструмента моделью). Живёт только в Message.toolTrace — для отображения, в контекст следующих вопросов не уходит. */
+export interface ToolStep {
+  id: string; // id tool_call от модели либо uid()
+  tool: string; // имя инструмента (web_search|read_page|get_time|…)
+  args: Record<string, unknown>; // распарсенные аргументы; {} если JSON битый
+  status: ToolStepStatus;
+  result?: string; // результат или текст ошибки; в toolTrace обрезан до 4000 симв.
+}
 
 export interface Message extends BaseEntity {
   chatId: string;
@@ -69,6 +82,12 @@ export interface Message extends BaseEntity {
    * корень чата. Поле не индексируем: дерево строится в памяти из выборки по chatId.
    */
   parentId?: string | null;
+  /** След агентского прогона (шаги инструментов) — только для отображения; в toContext/wire не попадает. */
+  toolTrace?: ToolStep[];
+  /** Метаданные прикреплённых файлов (не картинок). Текст — параллельно, в fileTexts[i]. Рендерится в пузыре чипом. */
+  files?: { name: string; size: number; textChars: number }[];
+  /** Извлечённый текст файлов, по индексу как в files. Не рендерится — уходит в wire через toContext. */
+  fileTexts?: string[];
 }
 
 /**
@@ -123,5 +142,7 @@ export interface Settings {
   historyLimit: number;
   // Мягкий предел трат за месяц, ₽. 0 — без предупреждения.
   monthlyBudgetRub: number;
+  /** Ключ Jina AI (s.jina.ai/r.jina.ai) для инструментов web_search/read_page. Пусто — запросы идут без Authorization (более жёсткий рейт-лимит). */
+  jinaKey?: string;
   updatedAt: string;
 }

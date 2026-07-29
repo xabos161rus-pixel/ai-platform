@@ -137,7 +137,7 @@ export function SettingsPage() {
                   onClick={() => void patchSettings({ activeProviderId: p.id, defaultModel: modelIds(p.models)[0] ?? 'demo-echo' })}
                 >
                   <span className="block truncate font-medium">{p.name}</span>
-                  <span className="block truncate font-mono text-[var(--cc-text-caption)] text-muted">
+                  <span className="block truncate font-mono text-[length:var(--cc-text-caption)] text-muted">
                     {p.isDemo ? t('settings.demoProviderNote') : p.baseUrl || t('settings.noAddress')}
                   </span>
                 </button>
@@ -229,7 +229,7 @@ export function SettingsPage() {
               return (
                 <div className="mt-2 space-y-1.5">
                   {top.map((row) => (
-                    <p key={row.model} className="flex items-baseline justify-between gap-3 text-[var(--cc-text-meta)]">
+                    <p key={row.model} className="flex items-baseline justify-between gap-3 text-[length:var(--cc-text-meta)]">
                       <span className="min-w-0 truncate text-muted">{modelLabel(row.model)}</span>
                       <span className="shrink-0 font-mono">
                         {formatTokens(row.tokens)} · {row.rub > 0 ? formatCost(row.rub) : '0 ₽'}
@@ -241,7 +241,7 @@ export function SettingsPage() {
                       const tokens = rest.reduce((s, r) => s + r.tokens, 0);
                       const rub = rest.reduce((s, r) => s + r.rub, 0);
                       return (
-                        <p className="flex items-baseline justify-between gap-3 text-[var(--cc-text-meta)]">
+                        <p className="flex items-baseline justify-between gap-3 text-[length:var(--cc-text-meta)]">
                           <span className="min-w-0 truncate text-muted">{t('settings.other')}</span>
                           <span className="shrink-0 font-mono">
                             {formatTokens(tokens)} · {rub > 0 ? formatCost(rub) : '0 ₽'}
@@ -254,13 +254,32 @@ export function SettingsPage() {
             })()}
         </Section>
 
+        <Section title={t('settings.tools')} hint={t('settings.toolsHint')}>
+          <label className="flex flex-col gap-1.5 py-1">
+            <span>{t('settings.jinaKey')}</span>
+            <input
+              type="password"
+              placeholder="jina_…"
+              value={settings.jinaKey ?? ''}
+              onChange={(e) => void patchSettings({ jinaKey: e.target.value })}
+              className="w-full rounded-[var(--cc-radius-sm)] bg-surface-2 px-2.5 py-2 font-mono outline-none"
+            />
+          </label>
+          <p className="mt-1 text-[length:var(--cc-text-caption)]">
+            <a href="https://jina.ai" target="_blank" rel="noreferrer" className="text-accent">
+              {t('settings.jinaGetKey')}
+            </a>
+          </p>
+          <p className="text-[length:var(--cc-text-caption)] text-muted">{t('settings.jinaFree')}</p>
+        </Section>
+
         <Section title={t('snippets.title')} hint={t('snippets.hint')}>
           <div className="space-y-1.5">
             {snippets.map((s) => (
               <div key={s.id} className="flex items-center gap-2 rounded-[var(--cc-radius)] border border-hairline px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{s.title}</span>
-                  <span className="block truncate text-[var(--cc-text-caption)] text-muted">{s.text}</span>
+                  <span className="block truncate text-[length:var(--cc-text-caption)] text-muted">{s.text}</span>
                 </div>
                 <button
                   aria-label={t('settings.editAria')}
@@ -332,7 +351,7 @@ export function SettingsPage() {
           </Button>
         </Section>
 
-        <p className="text-center font-mono text-[var(--cc-text-caption)] text-muted">
+        <p className="text-center font-mono text-[length:var(--cc-text-caption)] text-muted">
           {t('settings.buildLine', { build: BUILD_ID })}
         </p>
       </div>
@@ -371,7 +390,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   return (
     <section>
       <h2 className="mb-1 text-sm font-semibold">{title}</h2>
-      {hint && <p className="mb-2.5 text-[var(--cc-text-meta)] leading-relaxed text-muted">{hint}</p>}
+      {hint && <p className="mb-2.5 text-[length:var(--cc-text-meta)] leading-relaxed text-muted">{hint}</p>}
       {children}
     </section>
   );

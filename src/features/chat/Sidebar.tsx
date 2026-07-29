@@ -235,7 +235,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
                       />
                       <Folder size={14} className="shrink-0 text-muted" />
                       <span className="min-w-0 flex-1 truncate text-sm">{g.label}</span>
-                      <span className="ml-auto shrink-0 font-mono text-[var(--cc-text-caption)] text-muted">
+                      <span className="ml-auto shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">
                         {g.items.length}
                       </span>
                     </button>
@@ -258,7 +258,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
               return (
                 <div key={`label:${g.label || 'flat'}`} className="mb-1">
                   {g.label && (
-                    <p className="px-2 pt-3 pb-1 font-mono text-[var(--cc-text-caption)] tracking-wide text-muted uppercase">
+                    <p className="px-2 pt-3 pb-1 font-mono text-[length:var(--cc-text-caption)] tracking-wide text-muted uppercase">
                       {g.label}
                     </p>
                   )}
@@ -358,7 +358,7 @@ function ChatRow({
         <button onClick={onPick} className="min-w-0 flex-1 py-1.5 pl-2 text-left active:opacity-60">
           <span className="block truncate text-sm">{chat.title || t('chat.newChat')}</span>
           {fragment && (
-            <span className="block truncate text-[var(--cc-text-caption)] text-muted">
+            <span className="block truncate text-[length:var(--cc-text-caption)] text-muted">
               <Highlighted text={fragment} query={highlightQuery ?? ''} />
             </span>
           )}

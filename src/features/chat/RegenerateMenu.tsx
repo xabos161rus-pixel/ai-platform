@@ -57,7 +57,7 @@ export function RegenerateMenu({ rect, providers, currentProviderId, currentMode
         >
           <span className="min-w-0 flex-1 truncate">
             <span className="block truncate">{t('msg.retrySame')}</span>
-            <span className="block truncate font-mono text-[var(--cc-text-caption)] text-muted">
+            <span className="block truncate font-mono text-[length:var(--cc-text-caption)] text-muted">
               {modelLabel(currentModel)}
             </span>
           </span>
@@ -65,7 +65,7 @@ export function RegenerateMenu({ rect, providers, currentProviderId, currentMode
         <div className="my-1 border-t border-hairline" />
         {providers.map((p) => (
           <div key={p.id}>
-            <p className="px-2 pt-2 pb-1 font-mono text-[var(--cc-text-caption)] tracking-wide text-muted uppercase">
+            <p className="px-2 pt-2 pb-1 font-mono text-[length:var(--cc-text-caption)] tracking-wide text-muted uppercase">
               {p.name}
             </p>
             {modelEntries(p.models).map((m) => {

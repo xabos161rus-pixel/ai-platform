@@ -1,7 +1,16 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { ArrowUp, Paperclip, Square, X } from 'lucide-react';
+import { ArrowUp, FileText, Globe, Paperclip, Square, X } from 'lucide-react';
 import { useToast } from '../../components/ui/toastContext';
 import { compressImage, MAX_IMAGES } from '../../lib/images';
+import {
+  acceptAttr,
+  extractPdf,
+  extractText,
+  isPdfFile,
+  isTextFile,
+  MAX_MSG_FILE_CHARS,
+  type AttachedFile,
+} from '../../lib/files';
 import { useT } from '../../lib/i18n';
 import { SnippetMenu, type SnippetMenuHandle } from './SnippetMenu';
 
@@ -13,11 +22,16 @@ export interface ComposerHandle {
 interface Props {
   busy: boolean;
   canSend: boolean;
-  onSend: (text: string, images: string[]) => void | Promise<void>;
+  onSend: (text: string, images: string[], files: AttachedFile[]) => void | Promise<void>;
   onStop: () => void;
   /** ↑ в пустом поле вне сниппет-меню — открыть правку последнего своего сообщения. */
   onEditLast?: () => void;
+  /** Режим агентских инструментов текущего чата — переключается кнопкой-глобусом. */
+  toolMode: 'off' | 'tools' | 'research';
+  onToolMode: (m: 'off' | 'tools' | 'research') => void;
 }
+
+const NEXT_TOOL_MODE = { off: 'tools', tools: 'research', research: 'off' } as const;
 
 function autosize(el: HTMLTextAreaElement) {
   // Сбрасываем высоту перед замером, иначе не сжимается при удалении текста.
@@ -33,13 +47,14 @@ function autosize(el: HTMLTextAreaElement) {
  * чипов и правки по стрелке вверх.
  */
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
-  { busy, canSend, onSend, onStop, onEditLast },
+  { busy, canSend, onSend, onStop, onEditLast, toolMode, onToolMode },
   ref,
 ) {
   const toast = useToast();
   const t = useT();
   const [draft, setDraft] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [files, setFiles] = useState<AttachedFile[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -99,12 +114,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
 
   // Сжимаем и добавляем картинки по одной: одна битая не должна ронять
   // остальные, а лимит режем ДО чтения — чтобы не тратить время на файлы,
-  // которые всё равно не влезут.
-  async function addFiles(list: ArrayLike<File | null> | FileList | null) {
-    const files = Array.from(list ?? []).filter((f): f is File => !!f && f.type.startsWith('image/'));
+  // которые всё равно не влезут. Не-картинки (текст/PDF) обрабатываются
+  // отдельно ниже — у них свой лимит (символьный бюджет, а не счётчик штук).
+  async function addImages(list: File[]) {
     const room = MAX_IMAGES - images.length;
-    if (files.length > room) toast(t('composer.tooManyImages'));
-    for (const f of files.slice(0, room)) {
+    if (list.length > room) toast(t('composer.tooManyImages'));
+    for (const f of list.slice(0, room)) {
       try {
         const url = await compressImage(f);
         setImages((prev) => (prev.length >= MAX_IMAGES ? prev : [...prev, url]));
@@ -114,9 +129,53 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     }
   }
 
+  // Текст/PDF — по одному, с общим бюджетом MAX_MSG_FILE_CHARS на сообщение:
+  // файл, не влезающий целиком, обрезается до остатка; при нулевом остатке —
+  // отклоняется. Порядок важен: room считается по уже накопленным files на
+  // момент обработки каждого файла (не снимок на старте цикла).
+  async function addDocs(list: File[]) {
+    for (const f of list) {
+      let attached: AttachedFile;
+      try {
+        if (isPdfFile(f)) attached = await extractPdf(f);
+        else attached = await extractText(f);
+      } catch (e) {
+        if (e instanceof Error && e.message === 'too_big') toast(t('files.tooBig'));
+        else toast(t('files.readFailed'));
+        continue;
+      }
+      setFiles((prev) => {
+        const used = prev.reduce((n, x) => n + x.text.length, 0);
+        const room = MAX_MSG_FILE_CHARS - used;
+        if (room <= 0) {
+          toast(t('files.limitReached'));
+          return prev;
+        }
+        if (attached.text.length > room) {
+          toast(t('files.trimmed', { name: attached.name }));
+          return [...prev, { ...attached, text: attached.text.slice(0, room) }];
+        }
+        return [...prev, attached];
+      });
+    }
+  }
+
+  async function addFiles(list: ArrayLike<File | null> | FileList | null) {
+    const all = Array.from(list ?? []).filter((f): f is File => !!f);
+    const imgs = all.filter((f) => f.type.startsWith('image/'));
+    const docs: File[] = [];
+    for (const f of all) {
+      if (f.type.startsWith('image/')) continue;
+      if (isPdfFile(f) || isTextFile(f)) docs.push(f);
+      else toast(t('files.unsupported'));
+    }
+    await addImages(imgs);
+    await addDocs(docs);
+  }
+
   async function handleSend() {
     const text = draft.trim();
-    if ((!text && !images.length) || busy || !canSend) return;
+    if ((!text && !images.length && !files.length) || busy || !canSend) return;
     // Очистка ДО await — как раньше в ChatPage.handleSend: черновик не должен
     // «висеть» в поле, пока идёт запрос.
     setDraft('');
@@ -124,7 +183,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     if (inputRef.current) inputRef.current.style.height = 'auto';
     const imgs = images;
     setImages([]);
-    await onSend(text, imgs);
+    const fs = files;
+    setFiles([]);
+    await onSend(text, imgs, fs);
     inputRef.current?.focus();
   }
 
@@ -143,8 +204,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
 
   return (
     <div ref={wrapperRef} className="shrink-0 bg-bg">
-      {images.length > 0 && (
-        <div className="mx-auto flex w-full max-w-3xl gap-2 px-4 pt-2">
+      {(images.length > 0 || files.length > 0) && (
+        <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-4 pt-2">
           {images.map((src, i) => (
             <div key={i} className="relative shrink-0">
               <img src={src} alt={t('chat.attachmentAlt')} className="size-14 rounded-[var(--cc-radius-sm)] border border-hairline object-cover" />
@@ -152,6 +213,23 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
                 aria-label={t('composer.removeImageAria')}
                 className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-hairline bg-surface-2 text-muted active:opacity-60"
                 onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          {files.map((f, i) => (
+            <div
+              key={i}
+              className="flex shrink-0 items-center gap-1.5 rounded-[var(--cc-radius-sm)] border border-hairline bg-surface-2 px-2 py-1 text-[length:var(--cc-text-caption)]"
+            >
+              <FileText size={13} className="shrink-0 text-muted" />
+              <span className="max-w-[10rem] truncate">{f.name}</span>
+              <span className="shrink-0 text-muted">{t('files.kb', { n: Math.max(1, Math.round(f.size / 1024)) })}</span>
+              <button
+                aria-label={t('files.removeAria')}
+                className="shrink-0 text-muted active:opacity-60"
+                onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
               >
                 <X size={11} />
               </button>
@@ -171,17 +249,32 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           />
         )}
         <button
-          aria-label={t('chat.attachImage')}
-          disabled={busy || images.length >= MAX_IMAGES}
+          aria-label={t('chat.attachFile')}
+          disabled={busy}
           onClick={() => fileRef.current?.click()}
           className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
         >
           <Paperclip size={19} />
         </button>
+        <button
+          aria-label={t(`agent.mode.${toolMode}`)}
+          title={t(`agent.mode.${toolMode}`)}
+          onClick={() => onToolMode(NEXT_TOOL_MODE[toolMode])}
+          className={
+            'grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors active:opacity-60 ' +
+            (toolMode === 'research'
+              ? 'bg-accent/15 text-accent'
+              : toolMode === 'tools'
+                ? 'text-accent'
+                : 'text-muted hover:text-text')
+          }
+        >
+          <Globe size={19} />
+        </button>
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept={acceptAttr()}
           multiple
           className="hidden"
           onChange={(e) => {
@@ -238,12 +331,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           }}
           onPaste={(e) => {
             // Картинки из буфера — как выбор файлов; текстовые вставки не трогаем.
-            const files = Array.from(e.clipboardData.items)
+            const pasted = Array.from(e.clipboardData.items)
               .filter((i) => i.type.startsWith('image/'))
               .map((i) => i.getAsFile());
-            if (files.length) {
+            if (pasted.length) {
               e.preventDefault();
-              void addFiles(files);
+              void addFiles(pasted);
             }
           }}
         />
@@ -258,7 +351,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
         ) : (
           <button
             aria-label={t('chat.send')}
-            disabled={!draft.trim() && !images.length}
+            disabled={!draft.trim() && !images.length && !files.length}
             className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:opacity-25"
             onClick={() => void handleSend()}
           >

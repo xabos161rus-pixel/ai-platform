@@ -547,6 +547,95 @@ body = await p.textContent('body');
 // контекста, и счётчик показывал бы 2.
 check(body.includes('Сообщений в контексте: 3'), 'toContext-регресс: успешный ответ сравнения остался в контексте без явного выбора');
 
+// ── T-агент: тумблер режимов, демо-цикл инструментов, трейс в истории,
+// файлы, настройки Jina. Детерминированный старт: свежий чат, демо-провайдер
+// точно активен (сценарий сравнения выше переключал активного провайдера).
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+await p.getByText('Демо (без ключа)').first().click();
+await p.waitForTimeout(300);
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Новый чат' }).first().click();
+await p.waitForTimeout(500);
+
+// Тумблер-глобус в композере циклит три режима: выключено → поиск → исследование → выключено.
+check(await p.getByRole('button', { name: 'Инструменты: выключены' }).isVisible(), 'агент: глобус в композере, режим выключен');
+await p.getByRole('button', { name: 'Инструменты: выключены' }).click();
+await p.waitForTimeout(200);
+check(await p.getByRole('button', { name: 'Инструменты: поиск' }).isVisible(), 'агент: клик переключил в режим поиска');
+await p.getByRole('button', { name: 'Инструменты: поиск' }).click();
+await p.waitForTimeout(200);
+check(await p.getByRole('button', { name: 'Инструменты: исследование' }).isVisible(), 'агент: клик переключил в режим исследования');
+await p.getByRole('button', { name: 'Инструменты: исследование' }).click();
+await p.waitForTimeout(200);
+check(await p.getByRole('button', { name: 'Инструменты: выключены' }).isVisible(), 'агент: клик замкнул цикл обратно на «выключено»');
+await p.getByRole('button', { name: 'Инструменты: выключены' }).click();
+await p.waitForTimeout(200);
+check(await p.getByRole('button', { name: 'Инструменты: поиск' }).isVisible(), 'агент: остаёмся в режиме «поиск» для демо-цикла ниже');
+
+// Демо-имитация агентского цикла: триггерная фраза → 2 синтетических шага + канный ответ.
+// Шаги живут в UI только пока идёт стрим (~1с, затем сворачиваются в
+// историю) — проверяем строку шага и раскрытие результата сразу после
+// отправки, финальный ответ и свёрнутый трейс — отдельным ожиданием ниже.
+await p.getByPlaceholder('Спросите что угодно…').fill('найди лучшие практики');
+await p.getByRole('button', { name: 'Отправить' }).click();
+await p.waitForTimeout(300);
+check((await p.textContent('body')).includes('поиск:'), 'агент: строка шага web_search отрисована во время стрима');
+
+// Раскрытие результата шага кликом по его строке, пока шаг ещё виден live.
+const agentStepRow = p.locator('.max-w-3xl.space-y-5').getByText('поиск:', { exact: false }).first();
+await agentStepRow.click();
+await p.waitForTimeout(200);
+check((await p.textContent('body')).includes('Демо-источник A'), 'агент: клик по строке шага раскрыл канный результат');
+
+await p.waitForTimeout(2500);
+body = await p.textContent('body');
+check(body.includes('По данным поиска'), 'агент: финальный канный ответ демо-цикла пришёл');
+
+// Трейс переживает перезагрузку — свёрнутый заголовок «инструменты · 2» в истории.
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(1200);
+check((await p.textContent('body')).includes('инструменты · 2'), 'агент: свёрнутый трейс виден в истории после перезагрузки');
+await p.getByText('инструменты · 2', { exact: false }).first().click();
+await p.waitForTimeout(300);
+check((await p.textContent('body')).includes('поиск:'), 'агент: трейс раскрывается кликом и содержит шаг поиска');
+
+// Режим чата (toolMode) пережил перезагрузку — затем выключаем его обратно,
+// чтобы не влиять на возможные следующие сценарии.
+check(await p.getByRole('button', { name: 'Инструменты: поиск' }).isVisible(), 'агент: toolMode сохранён в чате после перезагрузки');
+await p.getByRole('button', { name: 'Инструменты: поиск' }).click();
+await p.waitForTimeout(200);
+await p.getByRole('button', { name: 'Инструменты: исследование' }).click();
+await p.waitForTimeout(200);
+check(await p.getByRole('button', { name: 'Инструменты: выключены' }).isVisible(), 'агент: режим выключен обратно (два клика)');
+
+// Файл: прикрепление .txt — чип в композере, затем в пузыре после отправки;
+// текст самого файла нигде в ленте не рендерится (только чип с именем).
+await p.locator('input[type=file][accept*="pdf"]').setInputFiles({
+  name: 'test.txt',
+  mimeType: 'text/plain',
+  buffer: Buffer.from('секретное содержимое тестового файла'),
+});
+await p.waitForTimeout(400);
+check((await p.textContent('body')).includes('test.txt'), 'файлы: чип виден в композере после прикрепления');
+await p.getByPlaceholder('Спросите что угодно…').fill('что в файле?');
+await p.getByRole('button', { name: 'Отправить' }).click();
+await p.waitForTimeout(2500);
+body = await p.textContent('body');
+check(body.includes('test.txt'), 'файлы: чип виден в пузыре сообщения после отправки');
+check(!body.includes('секретное содержимое'), 'файлы: текст файла не рендерится в ленте (только чип)');
+
+// Настройки: раздел «Инструменты» и сохранение ключа Jina между перезагрузками.
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+check((await p.textContent('body')).includes('Инструменты'), 'настройки: раздел «Инструменты» на месте');
+await p.getByPlaceholder('jina_…').fill('jina_test_123');
+await p.waitForTimeout(300);
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(600);
+check((await p.getByPlaceholder('jina_…').inputValue()) === 'jina_test_123', 'настройки: ключ Jina сохранился после перезагрузки');
+
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
 

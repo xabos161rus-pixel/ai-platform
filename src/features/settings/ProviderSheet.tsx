@@ -124,7 +124,7 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
 
         <div>
           <span className="mb-1 block text-sm font-medium">{t('provider.models')}</span>
-          <p className="mb-2 text-[var(--cc-text-caption)] leading-relaxed text-muted">{t('provider.modelsHead')}</p>
+          <p className="mb-2 text-[length:var(--cc-text-caption)] leading-relaxed text-muted">{t('provider.modelsHead')}</p>
           <div className="space-y-1.5">
             {rows.map((row, i) => (
               <div key={i} className="grid grid-cols-[1fr_4.5rem_4.5rem_2rem] items-center gap-1.5">
@@ -135,21 +135,21 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
                   autoCapitalize="off"
                   spellCheck={false}
                   onChange={(e) => updateRow(i, { id: e.target.value })}
-                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2.5 py-2.5 font-mono text-[var(--cc-text-body)] outline-none placeholder:text-muted"
+                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2.5 py-2.5 font-mono text-[length:var(--cc-text-body)] outline-none placeholder:text-muted"
                 />
                 <input
                   value={row.priceIn}
                   placeholder={t('provider.priceInPlaceholder')}
                   inputMode="decimal"
                   onChange={(e) => updateRow(i, { priceIn: e.target.value })}
-                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2 py-2.5 text-[var(--cc-text-body)] outline-none placeholder:text-muted"
+                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2 py-2.5 text-[length:var(--cc-text-body)] outline-none placeholder:text-muted"
                 />
                 <input
                   value={row.priceOut}
                   placeholder={t('provider.priceOutPlaceholder')}
                   inputMode="decimal"
                   onChange={(e) => updateRow(i, { priceOut: e.target.value })}
-                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2 py-2.5 text-[var(--cc-text-body)] outline-none placeholder:text-muted"
+                  className="w-full min-w-0 rounded-[var(--cc-radius)] bg-surface-2 px-2 py-2.5 text-[length:var(--cc-text-body)] outline-none placeholder:text-muted"
                 />
                 <button
                   aria-label={t('provider.removeModelAria')}
@@ -206,7 +206,7 @@ function Field({
         spellCheck={false}
         className="w-full rounded-[var(--cc-radius)] bg-surface-2 px-3 py-2.5 outline-none placeholder:text-muted"
       />
-      {hint && <span className="mt-1 block text-[var(--cc-text-caption)] leading-relaxed text-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-[length:var(--cc-text-caption)] leading-relaxed text-muted">{hint}</span>}
     </label>
   );
 }
