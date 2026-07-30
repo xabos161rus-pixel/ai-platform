@@ -1,12 +1,13 @@
 // Реестр инструментов агентского цикла.
 //
 // Инструменты работают через Jina AI (s.jina.ai — поиск, r.jina.ai — чтение
-// страницы): у Jina есть бесплатный тир без ключа, поэтому агентский режим
-// работает «из коробки», а свой ключ (Settings.jinaKey) просто снимает более
-// жёсткий рейт-лимит анонимных запросов.
+// страницы). Поиску ключ (Settings.jinaKey) ОБЯЗАТЕЛЕН — анонимный s.jina.ai
+// отвечает 401; чтение страниц работает и без ключа, но с жёстким рейт-лимитом.
 //
 // description/parameters у инструментов — английские: это wire-контент для
 // модели (JSON Schema function calling), а не UI-строка, i18n не участвует.
+// Тексты ошибок — русские и самодиагностирующие: их читает модель, и она
+// должна суметь пересказать пользователю, что именно сделать.
 
 import type { WireTool } from './client';
 
@@ -27,6 +28,27 @@ export const PAGE_CHAR_LIMIT = 12000;
 
 function authHeaders(jinaKey?: string): Record<string, string> {
   return jinaKey ? { Authorization: `Bearer ${jinaKey}` } : {};
+}
+
+/** Ошибка Jina → текст, по которому модель поймёт, что сказать пользователю. */
+function jinaError(status: number): Error {
+  if (status === 401 || status === 403) {
+    return new Error(
+      `Jina отклонила запрос (HTTP ${status}): нет или неверен API-ключ. ` +
+        'Передай пользователю: веб-поиску нужен бесплатный ключ с jina.ai — ' +
+        'вставить в Настройки → Инструменты → Ключ Jina AI.',
+    );
+  }
+  if (status === 402) {
+    return new Error('Квота ключа Jina исчерпана (HTTP 402). Передай пользователю: обновить ключ или пополнить баланс на jina.ai.');
+  }
+  if (status === 429) {
+    return new Error(
+      'Слишком много запросов к Jina (HTTP 429). Повтори чуть позже; если повторяется — ' +
+        'передай пользователю, что нужен свой ключ jina.ai (Настройки → Инструменты).',
+    );
+  }
+  return new Error(`HTTP ${status}`);
 }
 
 interface JinaSearchHit {
@@ -52,10 +74,17 @@ const webSearchTool: ToolDef = {
   async run(args, ctx) {
     const query = String(args.query ?? '');
     const res = await fetch(`https://s.jina.ai/?q=${encodeURIComponent(query)}`, {
-      headers: { Accept: 'application/json', ...authHeaders(ctx.jinaKey) },
+      headers: {
+        Accept: 'application/json',
+        // Только SERP (title/url/description), БЕЗ чтения топ-страниц ридером:
+        // иначе Jina ходит по каждому результату и ответ легко выходит за
+        // таймаут инструмента (ровно так поиск и «зависал» у DeepSeek).
+        'X-Respond-With': 'no-content',
+        ...authHeaders(ctx.jinaKey),
+      },
       signal: ctx.signal,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw jinaError(res.status);
     const json = (await res.json()) as JinaSearchResponse;
     const hits = (json.data ?? []).slice(0, SEARCH_TOP);
     // Wire-контент для модели (как и остальные строки результата инструмента) — по-английски, не через i18n.
@@ -87,7 +116,7 @@ const readPageTool: ToolDef = {
       headers: { ...authHeaders(ctx.jinaKey) },
       signal: ctx.signal,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw jinaError(res.status);
     const text = await res.text();
     if (text.length > PAGE_CHAR_LIMIT) {
       return `${text.slice(0, PAGE_CHAR_LIMIT)}\n\n[обрезано: показаны первые ${PAGE_CHAR_LIMIT} символов]`;

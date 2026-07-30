@@ -18,8 +18,9 @@ export const RESEARCH_SYSTEM =
   'Режим исследования: сначала краткий план поисков; минимум 3 разных запроса web_search с разными формулировками; ' +
   'прочитай 2–3 лучших источника через read_page; в конце ответа раздел "Источники" со ссылками.';
 
-/** Таймаут одного вызова инструмента. */
-export const TOOL_TIMEOUT_MS = 20000;
+/** Таймаут одного вызова инструмента. 30 с — тяжёлые страницы через r.jina.ai
+ *  реально отдаются 15–25 с; поиск после X-Respond-With: no-content быстрый. */
+export const TOOL_TIMEOUT_MS = 30000;
 
 /** Сколько символов результата инструмента остаётся в toolTrace (для отображения). Полный результат уходит модели через wireTail. */
 export const TRACE_RESULT_LIMIT = 4000;
@@ -305,7 +306,12 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
             // Внешний abort — единственное, что прерывает цикл целиком;
             // таймаут инструмента и прочие ошибки — просто error-шаг.
             if (signal?.aborted) throw new AiError('aborted', t('error.abortedInternal'));
-            const msg = String((e as Error)?.message ?? e).slice(0, 500);
+            let msg = String((e as Error)?.message ?? e).slice(0, 500);
+            // tc.abort('timeout') долетает сюда голой строкой-reason: разворачиваем
+            // в подсказку, по которой модель поймёт, что делать дальше.
+            if (msg === 'timeout') {
+              msg = `инструмент не ответил за ${TOOL_TIMEOUT_MS / 1000} с — повтори вызов или сузь запрос`;
+            }
             finishStep(onStep, step, 'error', msg);
             wireContent = `Error: ${msg}`;
           }
