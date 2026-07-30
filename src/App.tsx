@@ -5,6 +5,7 @@ import { db } from './db/db';
 import { ToastProvider } from './components/ui/Toast';
 import { ChatPage } from './features/chat/ChatPage';
 import { resolveLang, setLang, t } from './lib/i18n';
+import { runSync } from './lib/sync/engine';
 
 // Ленивая загрузка: настройки открываются заметно реже чата, и их код
 // (форма провайдера, сниппетов, экспорт/импорт) не должен утяжелять первый
@@ -49,6 +50,30 @@ function LangApplier() {
   return null;
 }
 
+/**
+ * Автосинк: старт приложения, возврат вкладки (visibilitychange→visible),
+ * каждые 90 с при включённом синке. runSync сам no-op, пока синк не
+ * настроен — накладных для пользователей без синка нет. Ошибки сети — тихо
+ * в cfg.lastError (экран настроек), без тоста на каждый неудачный фоновый тик.
+ */
+function SyncRunner() {
+  useEffect(() => {
+    void runSync().catch(() => {});
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void runSync().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVis);
+    const iv = setInterval(() => {
+      void runSync().catch(() => {});
+    }, 90_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      clearInterval(iv);
+    };
+  }, []);
+  return null;
+}
+
 /** Ловит throw при рендере — вместо белого экрана показывает fallback.
  *  Данные в IndexedDB при этом целы. */
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -81,6 +106,7 @@ export default function App() {
       <ToastProvider>
         <ThemeApplier />
         <LangApplier />
+        <SyncRunner />
         <ErrorBoundary>
           {/* fallback={null}: переход в настройки — это клик по уже видимой
               ссылке, лишний спиннер на долю секунды загрузки чанка был бы

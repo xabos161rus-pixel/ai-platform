@@ -1,22 +1,34 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
-import { ChevronLeft, Download, KeyRound, Keyboard, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, Cloud, Download, KeyRound, Keyboard, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { db, DEMO_PROVIDER_ID } from '../../db/db';
-import type { Provider, Snippet } from '../../db/types';
-import { now, stamp } from '../../lib/repo';
+import type { Provider, Snippet, SyncConfig } from '../../db/types';
+import { alive, now, stamp } from '../../lib/repo';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../components/ui/toastContext';
 import { monthSpendByModel, monthSpendRub, type ModelSpend } from '../../lib/ai/chatRepo';
 import { formatCost, formatTokens, modelIds, modelLabel } from '../../lib/ai/models';
 import { addSnippet, listSnippets, patchSnippet, removeSnippet } from '../../lib/ai/snippetRepo';
 import { exportAll, parseBackup, importAll, type BackupFile } from '../../lib/backup';
+import { scheduleSyncSoon } from '../../lib/sync/engine';
 import { ProviderSheet } from './ProviderSheet';
 import { SnippetSheet } from './SnippetSheet';
+import { SyncSheet } from './SyncSheet';
 import { ShortcutsSheet } from '../chat/ShortcutsSheet';
 import { useT } from '../../lib/i18n';
 
 const BUILD_ID = document.querySelector('meta[name="build-id"]')?.getAttribute('content') ?? 'dev';
+
+/** Строка статуса синка — по приоритету: выключено → ошибка → ни разу не синкалось → время последнего синка. */
+function syncStatusText(t: ReturnType<typeof useT>, cfg: SyncConfig | undefined): string {
+  if (!cfg?.enabled) return t('sync.statusOff');
+  if (cfg.lastError) return t('sync.statusError', { error: cfg.lastError.slice(0, 80) });
+  if (!cfg.lastSyncAt) return t('sync.statusNever');
+  return t('sync.statusOn', {
+    time: new Date(cfg.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  });
+}
 
 export function SettingsPage() {
   const toast = useToast();
@@ -26,11 +38,14 @@ export function SettingsPage() {
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
   const [addingSnippet, setAddingSnippet] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   const settings = useLiveQuery(() => db.settings.get('app'), []);
-  const providers = useLiveQuery(async () => db.providers.toArray(), [], [] as Provider[]);
+  // alive(): мягко удалённый провайдер (решение 12) не должен всплывать обратно в списке.
+  const providers = useLiveQuery(async () => alive(await db.providers.toArray()), [], [] as Provider[]);
   const snippets = useLiveQuery(() => listSnippets(), [], [] as Snippet[]);
+  const syncCfg = useLiveQuery(() => db.syncConfig.get('sync'), []);
   const spend = useLiveQuery(() => monthSpendRub(), [], 0);
   const byModel = useLiveQuery(() => monthSpendByModel(), [], [] as ModelSpend[]);
 
@@ -49,6 +64,7 @@ export function SettingsPage() {
     setEditing(null);
     setAdding(false);
     toast(t('settings.providerSaved'));
+    scheduleSyncSoon();
   }
 
   async function handleSaveSnippet(s: Pick<Snippet, 'title' | 'text'>, id?: string) {
@@ -68,9 +84,13 @@ export function SettingsPage() {
   async function handleRemoveProvider(p: Provider) {
     if (p.id === DEMO_PROVIDER_ID) return;
     if (!window.confirm(t('settings.deleteProviderConfirm', { name: p.name }))) return;
-    await db.providers.delete(p.id);
+    const ts = now();
+    // Мягко, по образцу personaRepo: запись должна уехать синком на второе
+    // устройство как удаление, а не молча пропасть только тут.
+    await db.providers.update(p.id, { deletedAt: ts, updatedAt: ts });
     if (settings?.activeProviderId === p.id) await patchSettings({ activeProviderId: DEMO_PROVIDER_ID });
     toast(t('settings.providerDeleted'));
+    scheduleSyncSoon();
   }
 
   async function handleExport() {
@@ -273,6 +293,18 @@ export function SettingsPage() {
           <p className="text-[length:var(--cc-text-caption)] text-muted">{t('settings.jinaFree')}</p>
         </Section>
 
+        <Section title={t('sync.title')} hint={t('sync.hint')}>
+          <p className="mb-2 text-sm text-muted">{syncStatusText(t, syncCfg)}</p>
+          <Button
+            variant="secondary"
+            className="inline-flex w-full items-center justify-center gap-2"
+            onClick={() => setSyncOpen(true)}
+          >
+            <Cloud size={18} />
+            {t('sync.configure')}
+          </Button>
+        </Section>
+
         <Section title={t('snippets.title')} hint={t('snippets.hint')}>
           <div className="space-y-1.5">
             {snippets.map((s) => (
@@ -379,6 +411,14 @@ export function SettingsPage() {
           setEditingSnippet(null);
         }}
         onSave={handleSaveSnippet}
+      />
+
+      <SyncSheet
+        // key перемонтирует форму при каждом открытии — тот же паттерн, что у ProviderSheet/SnippetSheet.
+        key={syncOpen ? 'open' : 'closed'}
+        open={syncOpen}
+        cfg={syncCfg}
+        onClose={() => setSyncOpen(false)}
       />
 
       <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie';
-import type { Chat, Message, Persona, Provider, Settings, Snippet } from './types';
+import type { Chat, Message, Persona, Provider, Settings, Snippet, SyncConfig } from './types';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export class AiPlatformDB extends Dexie {
   chats!: Table<Chat, string>;
@@ -10,6 +10,7 @@ export class AiPlatformDB extends Dexie {
   settings!: Table<Settings, string>;
   personas!: Table<Persona, string>;
   snippets!: Table<Snippet, string>;
+  syncConfig!: Table<SyncConfig, string>;
 
   constructor() {
     super('ai-platform');
@@ -30,6 +31,10 @@ export class AiPlatformDB extends Dexie {
     // activeLeafId, temperature, maxTokens и цены моделей живут в уже существующих
     // таблицах как неиндексируемые поля и версии Dexie не требуют.
     this.version(3).stores({ snippets: 'id' });
+    // v4: конфиг E2E-синхронизации, одна строка id 'sync' (индекс — только сам
+    // id, курсоры и токены читаются/пишутся целиком по ключу). Прежние таблицы
+    // наследуются из v3 без изменений, живые данные пользователя не мигрируются.
+    this.version(4).stores({ syncConfig: 'id' });
   }
 }
 

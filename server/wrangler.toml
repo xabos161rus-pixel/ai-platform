@@ -1,0 +1,23 @@
+name = "ai-platform-sync"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+# Публичные переменные (не секреты).
+[vars]
+ALLOW_ORIGIN = "https://xabos161rus-pixel.github.io"
+
+# D1 для синка (шифротекст) + TOFU-таблица spaces. database_id — плейсхолдер:
+# CI (worker.yml) создаёт базу через `wrangler d1 create` и подставляет
+# реальный uuid через sed перед деплоем. Локально (wrangler dev) без
+# подстановки D1-биндинг работать не будет — это ожидаемо, дев не входит в
+# сценарий этой главы.
+[[d1_databases]]
+binding = "DB"
+database_name = "ai-platform-sync"
+database_id = "TO_BE_CREATED"
+
+# Секрет SERPER_KEY (ключ serper.dev для /search) НЕ хранится в этом файле —
+# задаётся командой `npx wrangler secret put SERPER_KEY` или в дашборде
+# Cloudflare (Workers → ai-platform-sync → Settings → Variables). Без него
+# /search отвечает 501 {error:'search_disabled'} — рабочее состояние,
+# клиент молча фолбэчится на Jina.

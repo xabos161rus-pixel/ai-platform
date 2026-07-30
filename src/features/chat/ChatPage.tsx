@@ -50,7 +50,8 @@ import { RegenerateMenu } from './RegenerateMenu';
 import { Composer, type ComposerHandle } from './Composer';
 import { ShortcutsSheet } from './ShortcutsSheet';
 import { groupRuns } from '../../lib/ai/chatRepo';
-import { uid } from '../../lib/repo';
+import { alive, uid } from '../../lib/repo';
+import { scheduleSyncSoon } from '../../lib/sync/engine';
 
 /**
  * Куда уйдёт регенерация ответа: обычно это прямой родитель (вопрос) узла —
@@ -106,7 +107,11 @@ export function ChatPage() {
   const atBottom = useRef(true);
 
   const settings = useLiveQuery(() => db.settings.get('app'), []);
-  const providers = useLiveQuery(async () => db.providers.toArray(), [], [] as Provider[]);
+  // Конфиг синка (T2) — используется ниже, чтобы web_search замыкался на свой
+  // воркер вместо Jina, пока синк включён.
+  const syncCfg = useLiveQuery(() => db.syncConfig.get('sync'), []);
+  // alive(): мягко удалённый провайдер (решение 12) не должен всплывать в выборе модели/чата.
+  const providers = useLiveQuery(async () => alive(await db.providers.toArray()), [], [] as Provider[]);
   // БЕЗ значения по умолчанию: undefined = «ещё грузится», [] = «чатов нет».
   // С дефолтом [] эти состояния неразличимы, и эффект ниже успевает завести
   // лишний пустой чат до того, как подтянутся существующие.
@@ -133,6 +138,13 @@ export function ChatPage() {
   const historyLimit = settings?.historyLimit ?? 20;
   const jinaKey = settings?.jinaKey;
   const hasSettings = !!settings;
+  // Та же логика примитивов — теперь для syncCfg: lastSyncAt/lastError там
+  // меняются каждые 90 с фоновым автосинком (engine.ts), и если бы ask зависел
+  // от объекта целиком, он пересоздавался бы на каждый такой тик.
+  const syncSearchOn = !!syncCfg?.enabled && !!syncCfg.serverUrl;
+  const syncServerUrl = syncCfg?.serverUrl ?? '';
+  const syncSpaceId = syncCfg?.spaceId ?? '';
+  const syncAuthToken = syncCfg?.authToken ?? '';
 
   useEffect(() => {
     if (chats === undefined || chats.length || creating.current || !settings) return;
@@ -206,7 +218,13 @@ export function ChatPage() {
             onReasoning,
           });
         } else {
-          const tools = buildTools({ jinaKey });
+          // Синк включён и адрес сервера задан → web_search ходит через свой
+          // воркер (Serper), с молчаливым фолбэком на Jina внутри самого
+          // инструмента; иначе — undefined, и поведение ровно прежнее.
+          const tools = buildTools({
+            jinaKey,
+            sync: syncSearchOn ? { serverUrl: syncServerUrl, spaceId: syncSpaceId, authToken: syncAuthToken } : undefined,
+          });
           reply = await runAgent({
             provider: useProvider,
             messages: history,
@@ -261,9 +279,12 @@ export function ChatPage() {
         setStreamThink('');
         setAgentSteps([]);
         setBusy(false);
+        // Ответ записан — новые сообщения уезжают на второе устройство, не
+        // дожидаясь 90-секундного тика фонового автосинка.
+        scheduleSyncSoon();
       }
     },
-    [chat, hasSettings, historyLimit, providers, jinaKey, toast, t],
+    [chat, hasSettings, historyLimit, providers, jinaKey, syncSearchOn, syncServerUrl, syncSpaceId, syncAuthToken, toast, t],
   );
 
   /**
@@ -317,6 +338,9 @@ export function ChatPage() {
         abortRef.current = null;
         setCompareStream({});
         setBusy(false);
+        // Ответы записаны — новые сообщения уезжают на второе устройство, не
+        // дожидаясь 90-секундного тика фонового автосинка.
+        scheduleSyncSoon();
       }
     },
     [chat, hasSettings, historyLimit, providers],

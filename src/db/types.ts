@@ -146,3 +146,26 @@ export interface Settings {
   jinaKey?: string;
   updatedAt: string;
 }
+
+/**
+ * Конфиг E2E-синхронизации. НЕ extends BaseEntity — это локальные настройки
+ * устройства (как Settings), сама запись на сервер не уходит и не синкается.
+ * Секрет — введённая пользователем фраза — здесь не хранится вообще: только
+ * то, что из неё необратимо выведено (spaceId/authToken/aesKeyB64).
+ */
+export interface SyncConfig {
+  id: 'sync';
+  serverUrl: string;
+  spaceId: string; // hex, 64 символа — идентификатор пространства на сервере
+  authToken: string; // base64url 32 байта — bearer для воркера
+  aesKeyB64: string; // raw AES-GCM-256 ключ, base64url; сама фраза НЕ хранится
+  enabled: boolean;
+  lastPushAt: string; // курсор push (ISO); '' — ещё не пушили
+  lastPullAt: string; // курсор pull: первая половина составного курсора (updated_at, id)
+  // Вторая половина курсора pull. Сервер пагинирует по паре (updated_at, id) —
+  // курсор из одного lastPullAt терял бы записи с тем же миллисекундным
+  // штампом (тот самый баг, который в life-hub чинила миграция 0006).
+  lastPullId: string;
+  lastSyncAt: string; // время последнего успешного полного цикла; '' — не было
+  lastError: string; // '' — ошибок нет; показывается на экране синка
+}

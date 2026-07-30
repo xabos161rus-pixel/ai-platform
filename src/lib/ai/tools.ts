@@ -61,42 +61,91 @@ interface JinaSearchResponse {
   data?: JinaSearchHit[];
 }
 
-const webSearchTool: ToolDef = {
-  name: 'web_search',
-  description: 'Search the web and return top results with title, url and a short snippet.',
-  parameters: {
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'Search query text.' },
+/**
+ * Ветка веб-поиска через Jina (s.jina.ai) — то же тело, что раньше жило прямо
+ * в webSearchTool.run, вынесено отдельной функцией: нужна и как единственный
+ * путь при выключенном синке, и как молчаливый фолбэк, когда серверный поиск
+ * недоступен/выключен (см. makeWebSearchTool ниже).
+ */
+async function jinaSearch(query: string, ctx: ToolCtx): Promise<string> {
+  const res = await fetch(`https://s.jina.ai/?q=${encodeURIComponent(query)}`, {
+    headers: {
+      Accept: 'application/json',
+      // Только SERP (title/url/description), БЕЗ чтения топ-страниц ридером:
+      // иначе Jina ходит по каждому результату и ответ легко выходит за
+      // таймаут инструмента (ровно так поиск и «зависал» у DeepSeek).
+      'X-Respond-With': 'no-content',
+      ...authHeaders(ctx.jinaKey),
     },
-    required: ['query'],
-  },
-  async run(args, ctx) {
-    const query = String(args.query ?? '');
-    const res = await fetch(`https://s.jina.ai/?q=${encodeURIComponent(query)}`, {
-      headers: {
-        Accept: 'application/json',
-        // Только SERP (title/url/description), БЕЗ чтения топ-страниц ридером:
-        // иначе Jina ходит по каждому результату и ответ легко выходит за
-        // таймаут инструмента (ровно так поиск и «зависал» у DeepSeek).
-        'X-Respond-With': 'no-content',
-        ...authHeaders(ctx.jinaKey),
+    signal: ctx.signal,
+  });
+  if (!res.ok) throw jinaError(res.status);
+  const json = (await res.json()) as JinaSearchResponse;
+  const hits = (json.data ?? []).slice(0, SEARCH_TOP);
+  // Wire-контент для модели (как и остальные строки результата инструмента) — по-английски, не через i18n.
+  if (!hits.length) return 'No results found';
+  return hits
+    .map((h, i) => {
+      const snippet = (h.description ?? h.content ?? '').slice(0, 300);
+      return `${i + 1}. ${h.title ?? ''}\n${h.url ?? ''}\n${snippet}`;
+    })
+    .join('\n\n');
+}
+
+/** Конфиг серверного поиска: web_search ходит в свой воркер (Serper), пока синк включён. */
+export interface SyncSearchCtx {
+  serverUrl: string;
+  spaceId: string;
+  authToken: string;
+}
+
+/**
+ * Фабрика вместо константы: серверный конфиг синка (T4) замыкается на этапе
+ * сборки списка инструментов (buildTools), а НЕ прокидывается через ToolCtx —
+ * его собирает agentLoop.execWithTimeout сам как {signal, jinaKey}, и
+ * расширение ToolCtx потребовало бы правок agentLoop (решение 10). Так
+ * agentLoop остаётся нетронутым, а web_search просто получает готовый
+ * sync-конфиг из замыкания либо undefined.
+ */
+function makeWebSearchTool(sync?: SyncSearchCtx): ToolDef {
+  return {
+    name: 'web_search',
+    description: 'Search the web and return top results with title, url and a short snippet.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query text.' },
       },
-      signal: ctx.signal,
-    });
-    if (!res.ok) throw jinaError(res.status);
-    const json = (await res.json()) as JinaSearchResponse;
-    const hits = (json.data ?? []).slice(0, SEARCH_TOP);
-    // Wire-контент для модели (как и остальные строки результата инструмента) — по-английски, не через i18n.
-    if (!hits.length) return 'No results found';
-    return hits
-      .map((h, i) => {
-        const snippet = (h.description ?? h.content ?? '').slice(0, 300);
-        return `${i + 1}. ${h.title ?? ''}\n${h.url ?? ''}\n${snippet}`;
-      })
-      .join('\n\n');
-  },
-};
+      required: ['query'],
+    },
+    async run(args, ctx) {
+      const query = String(args.query ?? '');
+      if (sync) {
+        try {
+          const res = await fetch(`${sync.serverUrl}/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Space': sync.spaceId, Authorization: `Bearer ${sync.authToken}` },
+            body: JSON.stringify({ q: query }),
+            signal: ctx.signal,
+          });
+          if (!res.ok) throw new Error(`search ${res.status}`); // 501 без Serper-ключа, 429/402 квоты — всё в фолбэк
+          const data = (await res.json()) as { results?: { title?: string; url?: string; snippet?: string }[]; answer?: string | null };
+          const hits = (data.results ?? []).slice(0, SEARCH_TOP);
+          if (hits.length || data.answer) {
+            const head = data.answer ? `Ответ: ${data.answer}\n\n` : '';
+            return head + hits.map((h, i) => `${i + 1}. ${h.title ?? ''}\n${h.url ?? ''}\n${(h.snippet ?? '').slice(0, 300)}`).join('\n\n');
+          }
+          return 'No results found';
+        } catch (e) {
+          // Остановку пользователя уважаем — не подменяем фолбэком.
+          if (ctx.signal.aborted) throw e;
+          // Сервер лёг/квота/выключен поиск — молча падаем на Jina: пользователь просто получает результат.
+        }
+      }
+      return jinaSearch(query, ctx);
+    },
+  };
+}
 
 const readPageTool: ToolDef = {
   name: 'read_page',
@@ -136,12 +185,12 @@ const getTimeTool: ToolDef = {
   },
 };
 
-export function buildTools(opts: { jinaKey?: string }): ToolDef[] {
-  // jinaKey сейчас не влияет на состав списка — инструменты просто читают его
-  // из ToolCtx при вызове; параметр оставлен для симметрии с ToolCtx и на
-  // случай будущих инструментов, которым ключ понадобится на этапе сборки.
-  void opts;
-  return [webSearchTool, readPageTool, getTimeTool];
+export function buildTools(opts: { jinaKey?: string; sync?: SyncSearchCtx }): ToolDef[] {
+  // opts.jinaKey и здесь не участвует — инструменты читают его из ToolCtx на
+  // каждый вызов (его собирает agentLoop.execWithTimeout). А opts.sync нужен
+  // именно на этом этапе: серверный конфиг замыкается в web_search при сборке
+  // списка инструментов, а не через ToolCtx (см. makeWebSearchTool выше).
+  return [makeWebSearchTool(opts.sync), readPageTool, getTimeTool];
 }
 
 export function toWireTools(tools: ToolDef[]): WireTool[] {

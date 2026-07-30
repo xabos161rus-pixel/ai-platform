@@ -657,6 +657,118 @@ await p.reload({ waitUntil: 'networkidle' });
 await p.waitForTimeout(600);
 check((await p.getByPlaceholder('jina_…').inputValue()) === 'jina_test_123', 'настройки: ключ Jina сохранился после перезагрузки');
 
+// ── T5: Синхронизация между устройствами — воркер мокаем на уровне сети,
+// smoke не имеет доступа в интернет (сам воркер и его CI — вне этого клиента).
+// Проверяем: секция в настройках, шит, «Проверить связь», включение (деривация
+// фразы + первый цикл pull→push) и протокол запросов (заголовки авторизации).
+const syncCalls = [];
+await p.route(/ai-platform-sync/, async (route) => {
+  const req = route.request();
+  const u = new URL(req.url());
+  // route.fulfill НЕ освобождает от CORS — браузер проверяет сфабрикованный
+  // ответ как настоящий. Bearer+X-Space делают запрос «непростым», едет
+  // preflight OPTIONS; без явных ACAO/ACAH заголовков fetch упадёт, и синк
+  // покажет ошибку вместо успешного цикла.
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Space',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+  syncCalls.push({ path: u.pathname, method: req.method(), headers: req.headers() });
+  const reply = (data) =>
+    route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(data) });
+  if (u.pathname === '/health') return reply({ ok: true });
+  if (u.pathname === '/sync/push') return reply({ ok: true, count: 0 });
+  if (u.pathname === '/sync/pull') return reply({ records: [], hasMore: false, nextSince: '', nextSinceId: '' });
+  if (u.pathname === '/search') return reply({ results: [{ title: 'Мок', url: 'https://example.com', snippet: 'мок' }], answer: null });
+  return reply({ error: 'not found' });
+});
+
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+body = await p.textContent('body');
+check(body.includes('Синхронизация') && body.includes('выключена'), 'синк: секция «Синхронизация» на месте, статус «выключена»');
+
+await p.getByRole('button', { name: 'Настроить' }).click();
+await p.waitForTimeout(400);
+check(await p.getByPlaceholder('длинная фраза, одинаковая на всех устройствах').isVisible(), 'синк: шит настроек синхронизации открылся');
+
+await p.getByRole('button', { name: 'Проверить связь' }).click();
+await p.waitForTimeout(800);
+check((await p.textContent('body')).includes('Сервер отвечает'), 'синк: «Проверить связь» отчиталась об успехе (мок /health)');
+
+await p.getByPlaceholder('длинная фраза, одинаковая на всех устройствах').fill('фраза для смока раз два три');
+await p.getByRole('button', { name: 'Включить' }).click();
+// PBKDF2 310 000 итераций + фоновый runSync (пустая страница pull, затем push
+// всей накопленной смоком истории чатов/сообщений) — ждём с запасом.
+await p.waitForTimeout(4000);
+// Шит штатно закрывается сам сразу после сохранения конфига (onClose в конце
+// handleEnable) — но если по какой-то причине он ещё открыт, закрываем перед
+// чтением статуса на экране настроек.
+await p.keyboard.press('Escape');
+await p.waitForTimeout(300);
+body = await p.textContent('body');
+check(body.includes('включена'), 'синк: статус в настройках сменился на «включена» после первого цикла');
+
+check(syncCalls.some((c) => c.path === '/sync/pull'), 'синк: запрос GET /sync/pull ушёл на сервер');
+check(syncCalls.some((c) => c.path === '/sync/push'), 'синк: запрос POST /sync/push ушёл на сервер');
+const syncReq = syncCalls.find((c) => c.path.startsWith('/sync/'));
+check(/^[0-9a-f]{64}$/.test(syncReq?.headers['x-space'] ?? ''), 'синк: заголовок X-Space — hex-строка 64 символа (spaceId, 32 байта)');
+const authValue = syncReq?.headers['authorization'] ?? '';
+check(authValue.startsWith('Bearer ') && authValue.slice(7).length >= 40, 'синк: заголовок Authorization — Bearer-токен длиной ≥40 символов');
+
+// «Синхронизировать сейчас» показывается в шите только при enabled — переоткрываем шит.
+await p.getByRole('button', { name: 'Настроить' }).click();
+await p.waitForTimeout(400);
+check(await p.getByRole('button', { name: 'Синхронизировать сейчас' }).isVisible(), 'синк: кнопка «Синхронизировать сейчас» видна после включения');
+await p.getByRole('button', { name: 'Синхронизировать сейчас' }).click();
+await p.waitForTimeout(1200);
+check((await p.textContent('body')).includes('Синхронизировано'), 'синк: «Синхронизировать сейчас» отчиталась тостом об успехе');
+await p.keyboard.press('Escape');
+await p.waitForTimeout(300);
+
+// ── T5: регресс мягкого удаления провайдера. «Времянка» — отдельный от
+// «Тест» провайдер (тот занят более ранним toContext-сценарием, строки
+// 483–548, трогать нельзя): добавляем, удаляем, проверяем что мягкое удаление
+// (deletedAt, alive-фильтр) не путается с физическим и что чаты переживают
+// потерю активного провайдера.
+await p.getByRole('button', { name: 'Добавить провайдера' }).click();
+await p.waitForTimeout(400);
+await p.getByPlaceholder('Polza.ai', { exact: true }).fill('Времянка');
+await p.getByPlaceholder('https://api.polza.ai/api/v1').fill('https://example.invalid/v1');
+await p.getByPlaceholder('gpt-5.6').first().fill('tmp-1');
+await p.getByRole('button', { name: 'Сохранить' }).click();
+await p.waitForTimeout(600);
+body = await p.textContent('body');
+check(body.includes('Времянка'), 'провайдеры: «Времянка» добавлена и видна в списке');
+
+// Сохранение сделало «Времянку» активным провайдером (handleSaveProvider
+// проставляет activeProviderId у нового провайдера) — удаление ниже поэтому
+// заодно проверяет и откат активного провайдера на демо. Локатор берёт САМЫЙ
+// глубокий div, содержащий текст «Времянка» — это и есть строка провайдера в
+// списке (все её предки тоже технически «содержат» этот текст, но идут раньше
+// неё в document order, поэтому .last() зачерпывает именно строку).
+const timeRow = p.locator('div').filter({ hasText: 'Времянка' }).last();
+await timeRow.getByRole('button', { name: 'Удалить' }).click();
+await p.waitForTimeout(500);
+check(!(await p.textContent('body')).includes('Времянка'), 'провайдеры: «Времянка» пропала из списка после мягкого удаления');
+
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Новый чат' }).first().click();
+await p.waitForTimeout(500);
+await p.getByPlaceholder('Спросите что угодно…').fill('после удаления провайдера');
+await p.getByRole('button', { name: 'Отправить' }).click();
+await p.waitForTimeout(2000);
+body = await p.textContent('body');
+check(body.includes('Демо-режим'), 'провайдеры: новый чат после удаления активного провайдера отвечает демо-режимом');
+check(await p.getByPlaceholder('Спросите что угодно…').isVisible(), 'провайдеры: поле ввода на месте после смены активного провайдера');
+
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+check(!(await p.textContent('body')).includes('Времянка'), 'провайдеры: «Времянка» не вернулась после перезагрузки настроек (deletedAt в базе, а не фильтр рендера)');
+
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
 
