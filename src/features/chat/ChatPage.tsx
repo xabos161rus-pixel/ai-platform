@@ -990,6 +990,10 @@ const AssistantBlock = memo(function AssistantBlock({
           {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
             <span>
               {message.tokensIn}→{message.tokensOut}
+              {/* Мысли — подмножество out: показываем, куда ушёл счёт думающей
+                  модели; кеш — сколько входа пришло из кеша провайдера. */}
+              {message.tokensReasoning ? ` (${t('chat.reasoningTokens')} ${message.tokensReasoning})` : ''}
+              {message.tokensCached ? ` (${t('chat.cachedTokens')} ${message.tokensCached})` : ''}
               {cost && ` · ${cost}`}
             </span>
           ) : null}

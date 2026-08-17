@@ -56,6 +56,11 @@ export interface Message extends BaseEntity {
   model: string | null; // чем отвечено; у сообщений пользователя null
   tokensIn: number | null;
   tokensOut: number | null;
+  /** Токены размышлений — подмножество tokensOut (в стоимость уже входят).
+   *  Показываем, куда ушёл счёт; null/undefined — провайдер не отдал. */
+  tokensReasoning?: number | null;
+  /** Токены входа из кеша провайдера — подмножество tokensIn. */
+  tokensCached?: number | null;
   // Стоимость считаем на клиенте от usage и прайса. Храним снимок: прайс
   // со временем меняется, а «сколько это стоило» — факт.
   costRub: number | null;

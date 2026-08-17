@@ -15,6 +15,13 @@ import { getLang, t } from '../i18n';
 export interface Usage {
   in: number;
   out: number;
+  /** Токены размышлений — ПОДмножество out (completion_tokens их уже включает,
+   *  стоимость от out верна). Отдельно храним, чтобы показать, куда ушёл счёт:
+   *  у думающих моделей мысли — заметная часть выхода. null — провайдер не отдал. */
+  reasoning?: number | null;
+  /** Токены входа, прочитанные из кеша провайдера, — подмножество in. Обычно
+   *  тарифицируются дешевле; свой прайс кеша не выдумываем — только показываем. */
+  cached?: number | null;
 }
 
 export interface Reply {
@@ -251,7 +258,13 @@ interface StreamChunk {
     finish_reason?: string | null;
   }[];
   model?: string;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    // Детали в OpenAI-формате; агрегаторы отдают их не все и не всегда.
+    completion_tokens_details?: { reasoning_tokens?: number };
+    prompt_tokens_details?: { cached_tokens?: number };
+  };
 }
 
 /**
@@ -303,6 +316,10 @@ async function readSse(
       if (chunk.usage) {
         usage.in = Number(chunk.usage.prompt_tokens) || usage.in;
         usage.out = Number(chunk.usage.completion_tokens) || usage.out;
+        const rt = chunk.usage.completion_tokens_details?.reasoning_tokens;
+        if (typeof rt === 'number' && rt > 0) usage.reasoning = rt;
+        const ct = chunk.usage.prompt_tokens_details?.cached_tokens;
+        if (typeof ct === 'number' && ct > 0) usage.cached = ct;
       }
       const choice = chunk.choices?.[0];
       if (choice?.finish_reason) finishReason = choice.finish_reason;

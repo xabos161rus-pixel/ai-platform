@@ -188,6 +188,8 @@ export async function addAssistantMessage(
       model: reply.model,
       tokensIn: reply.usage.in,
       tokensOut: reply.usage.out,
+      tokensReasoning: reply.usage.reasoning ?? null,
+      tokensCached: reply.usage.cached ?? null,
       costRub: costRub(reply.model, reply.usage.in, reply.usage.out, opts?.provider),
       status: 'done',
       error: null,
