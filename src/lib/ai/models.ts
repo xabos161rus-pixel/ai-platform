@@ -85,6 +85,19 @@ export function costRub(
   return (tokensIn * m.priceIn + tokensOut * m.priceOut) / 1_000_000;
 }
 
+/** ₽ за 1M входных токенов модели — для оценки «≈сколько уйдёт» до отправки.
+ *  Логика источников та же, что в costRub: цена провайдера раньше встроенной. */
+export function priceInFor(modelId: string | null, provider?: Provider | null): number | null {
+  if (modelId && provider) {
+    const entry = modelEntries(provider.models).find(
+      (m) => m.id === modelId && (m.priceIn !== undefined || m.priceOut !== undefined),
+    );
+    if (entry) return entry.priceIn ?? 0;
+  }
+  const m = modelId ? modelById(modelId) : undefined;
+  return m ? m.priceIn : null;
+}
+
 export function formatCost(rub: number | null): string {
   if (rub === null) return '';
   if (rub === 0) return t('cost.free');

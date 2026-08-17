@@ -19,7 +19,7 @@ import { useToast } from '../../components/ui/toastContext';
 import { streamChat, errorText, type Reply } from '../../lib/ai/client';
 import { runAgent, RESEARCH_SYSTEM } from '../../lib/ai/agentLoop';
 import { buildTools } from '../../lib/ai/tools';
-import { formatCost, modelIds, modelLabel } from '../../lib/ai/models';
+import { estimateTokens, formatCost, modelIds, modelLabel, priceInFor } from '../../lib/ai/models';
 import {
   addAssistantMessage,
   addErrorMessage,
@@ -169,6 +169,19 @@ export function ChatPage() {
 
   // Уход с экрана обрывает запрос: иначе платим за токены впустую.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // ≈токены уже сидящего в контексте (история по лимиту + системный промпт):
+  // база для счётчика у композера. Та же выборка toContext, что уйдёт в запрос.
+  const baseTokens = useMemo(() => {
+    if (!chat) return 0;
+    const ctx = toContext(messages, historyLimit, chat.activeLeafId ?? null);
+    const history = ctx.reduce((n, m) => n + estimateTokens(m.content), 0);
+    return history + estimateTokens(chat.systemPrompt || '');
+  }, [messages, historyLimit, chat]);
+  const activePriceIn = useMemo(
+    () => (chat ? priceInFor(chat.model, provider) : null),
+    [chat, provider],
+  );
 
   // Разовое предупреждение «бюджет почти исчерпан» — раз на сессию, не спамим.
   const budgetWarned = useRef(false);
@@ -721,6 +734,8 @@ export function ChatPage() {
           onEditLast={handleEditLast}
           toolMode={chat?.toolMode ?? 'off'}
           onToolMode={(m) => chat && void patchChat(chat.id, { toolMode: m })}
+          baseTokens={baseTokens}
+          priceIn={activePriceIn}
         />
         </div>
       </div>

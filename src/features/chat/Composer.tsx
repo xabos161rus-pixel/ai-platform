@@ -17,6 +17,7 @@ import {
   type AttachedFile,
 } from '../../lib/files';
 import { useT } from '../../lib/i18n';
+import { estimateTokens } from '../../lib/ai/models';
 import { SnippetMenu, type SnippetMenuHandle } from './SnippetMenu';
 
 export interface ComposerHandle {
@@ -34,6 +35,10 @@ interface Props {
   /** Режим агентских инструментов текущего чата — переключается кнопкой-глобусом. */
   toolMode: 'off' | 'tools' | 'research';
   onToolMode: (m: 'off' | 'tools' | 'research') => void;
+  /** ≈токенов уже в контексте (история по лимиту + системный промпт) — из ChatPage. */
+  baseTokens?: number;
+  /** ₽ за 1M входных токенов активной модели; null — цена неизвестна. */
+  priceIn?: number | null;
 }
 
 const NEXT_TOOL_MODE = { off: 'tools', tools: 'research', research: 'off' } as const;
@@ -52,7 +57,7 @@ function autosize(el: HTMLTextAreaElement) {
  * чипов и правки по стрелке вверх.
  */
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
-  { busy, canSend, onSend, onStop, onEditLast, toolMode, onToolMode },
+  { busy, canSend, onSend, onStop, onEditLast, toolMode, onToolMode, baseTokens = 0, priceIn = null },
   ref,
 ) {
   const toast = useToast();
@@ -216,8 +221,21 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
 
   const query = menuOpen ? draft.slice(1) : '';
 
+  // ≈ вход следующего запроса: контекст (из ChatPage) + черновик + тексты
+  // вложений. Оценка честно приблизительная (символы/3, русский дороже) —
+  // поэтому знак «≈» и ничего на ней не блокируем; точные числа придут в
+  // usage после ответа. Пересчёт на каждый символ дешёвый: длины строк.
+  const estIn = baseTokens + estimateTokens(draft) + files.reduce((n, f) => n + estimateTokens(f.text), 0);
+  const estRub = priceIn != null ? (estIn * priceIn) / 1_000_000 : null;
+
   return (
     <div ref={wrapperRef} className="shrink-0 bg-bg">
+      {estIn > 0 && (draft.trim() || files.length > 0 || baseTokens > 0) && (
+        <p className="mx-auto w-full max-w-3xl px-4 pt-1 text-right font-mono text-[length:var(--cc-text-caption)] text-muted">
+          {t('composer.estIn', { n: estIn })}
+          {estRub != null && estRub >= 0.01 ? ` · ≈${estRub.toFixed(2).replace('.', ',')} ₽` : ''}
+        </p>
+      )}
       {(images.length > 0 || files.length > 0) && (
         <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-4 pt-2">
           {images.map((src, i) => (
