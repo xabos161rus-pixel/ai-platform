@@ -19,7 +19,7 @@ import { useToast } from '../../components/ui/toastContext';
 import { streamChat, errorText, type Reply } from '../../lib/ai/client';
 import { runAgent, RESEARCH_SYSTEM } from '../../lib/ai/agentLoop';
 import { buildTools } from '../../lib/ai/tools';
-import { estimateTokens, formatCost, modelIds, modelLabel, priceInFor } from '../../lib/ai/models';
+import { estimateTokens, formatCost, formatTokens, modelIds, modelLabel, priceInFor } from '../../lib/ai/models';
 import {
   addAssistantMessage,
   addErrorMessage,
@@ -717,14 +717,6 @@ export function ChatPage() {
         </div>
 
         <div className="shrink-0 border-t border-hairline bg-bg">
-          <div className="mx-auto w-full max-w-3xl px-4 pt-2">
-            <CompareBar
-              providers={providers}
-              picks={settings?.compareModels ?? []}
-              onChange={(keys) => void setComparePicks(keys)}
-            />
-          </div>
-        </div>
         <Composer
           ref={composerRef}
           busy={busy}
@@ -736,7 +728,15 @@ export function ChatPage() {
           onToolMode={(m) => chat && void patchChat(chat.id, { toolMode: m })}
           baseTokens={baseTokens}
           priceIn={activePriceIn}
+          barSlot={
+            <CompareBar
+              providers={providers}
+              picks={settings?.compareModels ?? []}
+              onChange={(keys) => void setComparePicks(keys)}
+            />
+          }
         />
+        </div>
         </div>
       </div>
 
@@ -1031,12 +1031,12 @@ const AssistantBlock = memo(function AssistantBlock({
         )}
         <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
           {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
-            <span>
-              {message.tokensIn}→{message.tokensOut}
-              {/* Мысли — подмножество out: показываем, куда ушёл счёт думающей
-                  модели; кеш — сколько входа пришло из кеша провайдера. */}
-              {message.tokensReasoning ? ` (${t('chat.reasoningTokens')} ${message.tokensReasoning})` : ''}
-              {message.tokensCached ? ` (${t('chat.cachedTokens')} ${message.tokensCached})` : ''}
+            /* Один тихий ряд через точки, без скобок: мысли — подмножество
+               out (куда ушёл счёт думающей модели), кеш — вход из кеша. */
+            <span className="tabular-nums">
+              {formatTokens(message.tokensIn)}→{formatTokens(message.tokensOut ?? 0)}
+              {message.tokensReasoning ? ` · ${t('chat.reasoningTokens')} ${formatTokens(message.tokensReasoning)}` : ''}
+              {message.tokensCached ? ` · ${t('chat.cachedTokens')} ${formatTokens(message.tokensCached)}` : ''}
               {cost && ` · ${cost}`}
             </span>
           ) : null}

@@ -17,7 +17,7 @@ import {
   type AttachedFile,
 } from '../../lib/files';
 import { useT } from '../../lib/i18n';
-import { estimateTokens } from '../../lib/ai/models';
+import { estimateTokens, formatTokens } from '../../lib/ai/models';
 import { SnippetMenu, type SnippetMenuHandle } from './SnippetMenu';
 
 export interface ComposerHandle {
@@ -39,6 +39,9 @@ interface Props {
   baseTokens?: number;
   /** ₽ за 1M входных токенов активной модели; null — цена неизвестна. */
   priceIn?: number | null;
+  /** Левый конец служебной строки (панель сравнения) — рендерится напротив
+   *  счётчика ≈входа, чтобы строка была одна, а не две сироты друг над другом. */
+  barSlot?: React.ReactNode;
 }
 
 const NEXT_TOOL_MODE = { off: 'tools', tools: 'research', research: 'off' } as const;
@@ -57,7 +60,7 @@ function autosize(el: HTMLTextAreaElement) {
  * чипов и правки по стрелке вверх.
  */
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
-  { busy, canSend, onSend, onStop, onEditLast, toolMode, onToolMode, baseTokens = 0, priceIn = null },
+  { busy, canSend, onSend, onStop, onEditLast, toolMode, onToolMode, baseTokens = 0, priceIn = null, barSlot },
   ref,
 ) {
   const toast = useToast();
@@ -230,12 +233,22 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
 
   return (
     <div ref={wrapperRef} className="shrink-0 bg-bg">
-      {estIn > 0 && (draft.trim() || files.length > 0 || baseTokens > 0) && (
-        <p className="mx-auto w-full max-w-3xl px-4 pt-1 text-right font-mono text-[length:var(--cc-text-caption)] text-muted">
-          {t('composer.estIn', { n: estIn })}
-          {estRub != null && estRub >= 0.01 ? ` · ≈${estRub.toFixed(2).replace('.', ',')} ₽` : ''}
-        </p>
-      )}
+      {/* Служебная строка композера: слева режим сравнения, справа тихая
+          метрика ≈входа. Одна строка, два конца — не две сироты друг над
+          другом. tabular-nums держит ширину цифр, чтобы текст не дрожал при
+          наборе; подробности — в title, строка не объясняет сама себя. */}
+      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 pt-2">
+        <div className="min-w-0">{barSlot}</div>
+        {estIn > 0 && (
+          <span
+            title={t('composer.estTitle')}
+            className="shrink-0 cursor-default font-mono text-[length:var(--cc-text-caption)] text-muted/70 tabular-nums transition-opacity"
+          >
+            {t('composer.estIn', { n: formatTokens(estIn) })}
+            {estRub != null && estRub >= 0.01 ? ` · ${estRub.toFixed(2).replace('.', ',')} ₽` : ''}
+          </span>
+        )}
+      </div>
       {(images.length > 0 || files.length > 0) && (
         <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-4 pt-2">
           {images.map((src, i) => (

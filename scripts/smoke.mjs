@@ -34,7 +34,7 @@ check((await p.textContent('body')).includes('демо'), 'демо-провай
 
 // Сквозной сценарий: вопрос → ответ заглушки → метрики
 await p.getByPlaceholder('Спросите что угодно…').fill('Привет, проверка');
-check((await p.textContent('body')).includes('ткн вход'), 'счётчик ≈входа виден при наборе');
+check((await p.textContent('body')).includes('токенов'), 'счётчик ≈входа виден при наборе');
 await p.getByRole('button', { name: 'Отправить' }).click();
 await p.waitForTimeout(2000);
 let body = await p.textContent('body');
