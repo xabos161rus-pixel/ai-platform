@@ -25,6 +25,7 @@ import {
   addErrorMessage,
   addUserMessage,
   chatMessages,
+  monthSpendRub,
   createChat,
   editUserMessage,
   exportMarkdown,
@@ -136,6 +137,7 @@ export function ChatPage() {
   // пересоздавались бы на каждый такой чих и рвали React.memo у сообщений
   // ленты ниже — они получают ask через handleRegenerate/handleSubmitEdit.
   const historyLimit = settings?.historyLimit ?? 20;
+  const monthlyBudgetRub = settings?.monthlyBudgetRub ?? 0;
   const jinaKey = settings?.jinaKey;
   const hasSettings = !!settings;
   // Та же логика примитивов — теперь для syncCfg: lastSyncAt/lastError там
@@ -168,9 +170,32 @@ export function ChatPage() {
   // Уход с экрана обрывает запрос: иначе платим за токены впустую.
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // Разовое предупреждение «бюджет почти исчерпан» — раз на сессию, не спамим.
+  const budgetWarned = useRef(false);
+
+  /** Гейт месячного бюджета перед платным запросом. true — можно отправлять.
+   *  Демо не гейтится: он бесплатный и должен работать всегда. */
+  const passBudget = useCallback(
+    async (prov: Provider | null): Promise<boolean> => {
+      if (!monthlyBudgetRub || !prov || prov.isDemo) return true;
+      const spend = await monthSpendRub();
+      if (spend >= monthlyBudgetRub) {
+        toast(t('chat.budgetBlocked'));
+        return false;
+      }
+      if (spend >= monthlyBudgetRub * 0.8 && !budgetWarned.current) {
+        budgetWarned.current = true;
+        toast(t('chat.budgetWarning'));
+      }
+      return true;
+    },
+    [monthlyBudgetRub, toast, t],
+  );
+
   const ask = useCallback(
     async (opts?: { leafId?: string; model?: string; providerId?: string }) => {
       if (!chat || !hasSettings) return;
+      if (!(await passBudget(providers.find((p) => p.id === (opts?.providerId ?? chat.providerId)) ?? null))) return;
       setBusy(true);
       setStreamText('');
       setStreamThink('');
@@ -284,7 +309,7 @@ export function ChatPage() {
         scheduleSyncSoon();
       }
     },
-    [chat, hasSettings, historyLimit, providers, jinaKey, syncSearchOn, syncServerUrl, syncSpaceId, syncAuthToken, toast, t],
+    [chat, hasSettings, historyLimit, providers, jinaKey, syncSearchOn, syncServerUrl, syncSpaceId, syncAuthToken, toast, t, passBudget],
   );
 
   /**
@@ -295,6 +320,9 @@ export function ChatPage() {
   const askCompare = useCallback(
     async (picks: { providerId: string; model: string }[], opts?: { leafId?: string }) => {
       if (!chat || !hasSettings) return;
+      // Сравнение — сразу N платных запросов: гейт по первому платному провайдеру.
+      const paid = picks.map((pk) => providers.find((p) => p.id === pk.providerId) ?? null).find((p) => p && !p.isDemo);
+      if (paid && !(await passBudget(paid))) return;
       setBusy(true);
       setCompareStream({});
       const ac = new AbortController();
@@ -343,7 +371,7 @@ export function ChatPage() {
         scheduleSyncSoon();
       }
     },
-    [chat, hasSettings, historyLimit, providers],
+    [chat, hasSettings, historyLimit, providers, passBudget],
   );
 
   /** Отправка из композера: черновик, картинки и файлы уже очищены им самим. */

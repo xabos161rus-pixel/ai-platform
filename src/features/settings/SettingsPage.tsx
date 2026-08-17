@@ -238,10 +238,42 @@ export function SettingsPage() {
               className="w-20 rounded-[var(--cc-radius-sm)] bg-surface-2 px-2.5 py-2 text-right outline-none"
             />
           </label>
+          <label className="flex items-center gap-3 border-t border-hairline py-1 pt-3">
+            <span className="flex-1">
+              {t('settings.monthlyBudget')}
+              <span className="block text-[length:var(--cc-text-meta)] text-muted">{t('settings.monthlyBudgetHint')}</span>
+            </span>
+            <input
+              type="number"
+              min={0}
+              step={100}
+              value={settings.monthlyBudgetRub || ''}
+              placeholder="0"
+              onChange={(e) => void patchSettings({ monthlyBudgetRub: Math.max(0, Number(e.target.value) || 0) })}
+              className="w-24 rounded-[var(--cc-radius-sm)] bg-surface-2 px-2.5 py-2 text-right outline-none"
+            />
+          </label>
           <p className="mt-2 flex items-center justify-between border-t border-hairline pt-3 text-sm">
             <span className="text-muted">{t('settings.spentThisMonth')}</span>
             <span className="font-mono">{spend > 0 ? formatCost(spend) : '0 ₽'}</span>
           </p>
+          {settings.monthlyBudgetRub > 0 && (
+            <div className="mt-2">
+              {/* Полоса расхода: до 80% — акцент, дальше — предупреждение, за
+                  бюджетом — danger. Те же пороги, что у гейта отправки в чате. */}
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    spend >= settings.monthlyBudgetRub ? 'bg-danger' : spend >= settings.monthlyBudgetRub * 0.8 ? 'bg-warning' : 'bg-accent'
+                  }`}
+                  style={{ width: `${Math.min(100, (spend / settings.monthlyBudgetRub) * 100)}%` }}
+                />
+              </div>
+              <p className="mt-1 text-right font-mono text-[length:var(--cc-text-meta)] text-muted">
+                {Math.round((spend / settings.monthlyBudgetRub) * 100)}% · {formatCost(settings.monthlyBudgetRub)}
+              </p>
+            </div>
+          )}
           {byModel.length > 0 &&
             (() => {
               const top = byModel.slice(0, 5);
