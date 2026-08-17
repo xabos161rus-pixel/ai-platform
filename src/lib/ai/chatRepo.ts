@@ -357,14 +357,23 @@ export function exportMarkdown(chat: Chat, messages: Message[]): string {
   return `${head}\n${body}\n`;
 }
 
+/** ISO-граница «начало текущего календарного месяца» в локальном времени. */
+function monthStartIso(shiftMonths = 0): string {
+  const from = new Date();
+  from.setMonth(from.getMonth() + shiftMonths, 1);
+  from.setHours(0, 0, 0, 0);
+  return from.toISOString();
+}
+
+/** Сообщения с createdAt >= iso — range по индексу v5, без полного скана. */
+async function messagesSince(iso: string): Promise<Message[]> {
+  return db.messages.where('createdAt').aboveOrEqual(iso).toArray();
+}
+
 /** Суммарные траты за текущий календарный месяц, ₽. */
 export async function monthSpendRub(): Promise<number> {
-  const from = new Date();
-  from.setDate(1);
-  from.setHours(0, 0, 0, 0);
-  const iso = from.toISOString();
-  const rows = await db.messages.toArray();
-  return rows.reduce((sum, m) => (m.createdAt >= iso ? sum + (m.costRub ?? 0) : sum), 0);
+  const rows = await messagesSince(monthStartIso());
+  return rows.reduce((sum, m) => sum + (m.costRub ?? 0), 0);
 }
 
 export interface ModelSpend {
@@ -379,12 +388,8 @@ export interface ModelSpend {
  * установке секция всегда пуста и непроверяема в smoke.
  */
 export async function monthSpendByModel(): Promise<ModelSpend[]> {
-  const from = new Date();
-  from.setDate(1);
-  from.setHours(0, 0, 0, 0);
-  const iso = from.toISOString();
-  const rows = alive(await db.messages.toArray()).filter(
-    (m) => m.role === 'assistant' && m.model && m.createdAt >= iso,
+  const rows = alive(await messagesSince(monthStartIso())).filter(
+    (m) => m.role === 'assistant' && m.model,
   );
   const byModel = new Map<string, ModelSpend>();
   for (const m of rows) {
@@ -397,4 +402,92 @@ export async function monthSpendByModel(): Promise<ModelSpend[]> {
   return [...byModel.values()]
     .filter((e) => e.tokens !== 0 || e.rub !== 0)
     .sort((a, b) => b.rub - a.rub || b.tokens - a.tokens);
+}
+
+export interface DaySpend {
+  day: string; // 'YYYY-MM-DD' локальной даты
+  rub: number;
+  tokens: number;
+}
+
+/** Расход по дням за последние N суток (включая пустые дни — для ровной оси). */
+export async function spendByDay(days = 30): Promise<DaySpend[]> {
+  const from = new Date();
+  from.setDate(from.getDate() - (days - 1));
+  from.setHours(0, 0, 0, 0);
+  const rows = alive(await messagesSince(from.toISOString())).filter((m) => m.role === 'assistant');
+  const byDay = new Map<string, DaySpend>();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(from);
+    d.setDate(from.getDate() + i);
+    const key = localDayKey(d);
+    byDay.set(key, { day: key, rub: 0, tokens: 0 });
+  }
+  for (const m of rows) {
+    const entry = byDay.get(localDayKey(new Date(m.createdAt)));
+    if (!entry) continue;
+    entry.rub += m.costRub ?? 0;
+    entry.tokens += (m.tokensIn ?? 0) + (m.tokensOut ?? 0);
+  }
+  return [...byDay.values()];
+}
+
+/** 'YYYY-MM-DD' в ЛОКАЛЬНОМ времени: день на счётчике должен совпадать с днём
+ *  человека, а toISOString() резал бы сутки по UTC (в Москве — со сдвигом 3 ч). */
+function localDayKey(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+export interface ChatSpend {
+  chatId: string;
+  title: string;
+  rub: number;
+  tokens: number;
+}
+
+/** Топ чатов по тратам за текущий месяц. Заголовки — join по живым чатам;
+ *  сообщения удалённых чатов не показываем (их не открыть), но в общих суммах
+ *  месяца они остаются. */
+export async function monthSpendByChat(top = 5): Promise<ChatSpend[]> {
+  const rows = alive(await messagesSince(monthStartIso())).filter((m) => m.role === 'assistant');
+  const byChat = new Map<string, ChatSpend>();
+  for (const m of rows) {
+    const entry = byChat.get(m.chatId) ?? { chatId: m.chatId, title: '', rub: 0, tokens: 0 };
+    entry.rub += m.costRub ?? 0;
+    entry.tokens += (m.tokensIn ?? 0) + (m.tokensOut ?? 0);
+    byChat.set(m.chatId, entry);
+  }
+  const ids = [...byChat.keys()];
+  const chats = (await db.chats.bulkGet(ids)).filter(Boolean) as Chat[];
+  const titles = new Map(chats.filter((c) => !c.deletedAt).map((c) => [c.id, c.title]));
+  return [...byChat.values()]
+    .filter((e) => titles.has(e.chatId) && (e.rub > 0 || e.tokens > 0))
+    .map((e) => ({ ...e, title: titles.get(e.chatId) ?? '' }))
+    .sort((a, b) => b.rub - a.rub || b.tokens - a.tokens)
+    .slice(0, top);
+}
+
+export interface MonthSpend {
+  month: string; // 'YYYY-MM'
+  rub: number;
+  tokens: number;
+}
+
+/** История трат по месяцам, свежие сверху. Месяцы без трат опущены. */
+export async function spendMonths(count = 6): Promise<MonthSpend[]> {
+  const rows = alive(await messagesSince(monthStartIso(-(count - 1)))).filter((m) => m.role === 'assistant');
+  const byMonth = new Map<string, MonthSpend>();
+  for (const m of rows) {
+    const d = new Date(m.createdAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const entry = byMonth.get(key) ?? { month: key, rub: 0, tokens: 0 };
+    entry.rub += m.costRub ?? 0;
+    entry.tokens += (m.tokensIn ?? 0) + (m.tokensOut ?? 0);
+    byMonth.set(key, entry);
+  }
+  return [...byMonth.values()]
+    .filter((e) => e.rub > 0 || e.tokens > 0)
+    .sort((a, b) => b.month.localeCompare(a.month));
 }

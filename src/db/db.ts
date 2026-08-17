@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { Chat, Message, Persona, Provider, Settings, Snippet, SyncConfig } from './types';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export class AiPlatformDB extends Dexie {
   chats!: Table<Chat, string>;
@@ -35,6 +35,10 @@ export class AiPlatformDB extends Dexie {
     // id, курсоры и токены читаются/пишутся целиком по ключу). Прежние таблицы
     // наследуются из v3 без изменений, живые данные пользователя не мигрируются.
     this.version(4).stores({ syncConfig: 'id' });
+    // v5: индекс createdAt у сообщений. Статистика трат и гейт бюджета читают
+    // «сообщения с начала месяца» на каждый платный запрос — полный скан самой
+    // горячей таблицы там уже не к месту, range-выборка по индексу дешевле.
+    this.version(5).stores({ messages: 'id, chatId, createdAt' });
   }
 }
 

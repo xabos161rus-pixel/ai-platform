@@ -7,7 +7,17 @@ import type { Provider, Snippet, SyncConfig } from '../../db/types';
 import { alive, now, stamp } from '../../lib/repo';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../components/ui/toastContext';
-import { monthSpendByModel, monthSpendRub, type ModelSpend } from '../../lib/ai/chatRepo';
+import {
+  monthSpendByChat,
+  monthSpendByModel,
+  monthSpendRub,
+  spendByDay,
+  spendMonths,
+  type ChatSpend,
+  type DaySpend,
+  type ModelSpend,
+  type MonthSpend,
+} from '../../lib/ai/chatRepo';
 import { formatCost, formatTokens, modelIds, modelLabel } from '../../lib/ai/models';
 import { addSnippet, listSnippets, patchSnippet, removeSnippet } from '../../lib/ai/snippetRepo';
 import { exportAll, parseBackup, importAll, type BackupFile } from '../../lib/backup';
@@ -48,6 +58,9 @@ export function SettingsPage() {
   const syncCfg = useLiveQuery(() => db.syncConfig.get('sync'), []);
   const spend = useLiveQuery(() => monthSpendRub(), [], 0);
   const byModel = useLiveQuery(() => monthSpendByModel(), [], [] as ModelSpend[]);
+  const byDay = useLiveQuery(() => spendByDay(30), [], [] as DaySpend[]);
+  const byChat = useLiveQuery(() => monthSpendByChat(5), [], [] as ChatSpend[]);
+  const months = useLiveQuery(() => spendMonths(6), [], [] as MonthSpend[]);
 
   async function patchSettings(changes: Partial<typeof settings>) {
     await db.settings.update('app', { ...changes, updatedAt: now() });
@@ -304,6 +317,53 @@ export function SettingsPage() {
                 </div>
               );
             })()}
+          {/* Расход по дням: 30 столбиков без библиотек — див с высотой от max.
+              Ось не подписываем: это градусник «где жгло», а не аналитика. */}
+          {byDay.some((d) => d.rub > 0) &&
+            (() => {
+              const max = Math.max(...byDay.map((d) => d.rub));
+              return (
+                <div className="mt-3 border-t border-hairline pt-3">
+                  <p className="mb-1.5 text-[length:var(--cc-text-meta)] text-muted">{t('settings.spendByDay')}</p>
+                  <div className="flex h-12 items-end gap-[2px]">
+                    {byDay.map((d) => (
+                      <div
+                        key={d.day}
+                        title={`${d.day} · ${d.rub > 0 ? formatCost(d.rub) : '0 ₽'}`}
+                        className={`min-w-0 flex-1 rounded-t-[2px] ${d.rub > 0 ? 'bg-accent' : 'bg-surface-2'}`}
+                        style={{ height: d.rub > 0 ? `${Math.max(8, (d.rub / max) * 100)}%` : '3px' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          {byChat.length > 0 && (
+            <div className="mt-3 space-y-1.5 border-t border-hairline pt-3">
+              <p className="text-[length:var(--cc-text-meta)] text-muted">{t('settings.spendByChat')}</p>
+              {byChat.map((c) => (
+                <p key={c.chatId} className="flex items-baseline justify-between gap-3 text-[length:var(--cc-text-meta)]">
+                  <span className="min-w-0 truncate text-muted">{c.title || t('chat.newChat')}</span>
+                  <span className="shrink-0 font-mono">
+                    {formatTokens(c.tokens)} · {c.rub > 0 ? formatCost(c.rub) : '0 ₽'}
+                  </span>
+                </p>
+              ))}
+            </div>
+          )}
+          {months.length > 1 && (
+            <div className="mt-3 space-y-1.5 border-t border-hairline pt-3">
+              <p className="text-[length:var(--cc-text-meta)] text-muted">{t('settings.spendMonths')}</p>
+              {months.map((m) => (
+                <p key={m.month} className="flex items-baseline justify-between gap-3 text-[length:var(--cc-text-meta)]">
+                  <span className="min-w-0 truncate text-muted">{m.month}</span>
+                  <span className="shrink-0 font-mono">
+                    {formatTokens(m.tokens)} · {m.rub > 0 ? formatCost(m.rub) : '0 ₽'}
+                  </span>
+                </p>
+              ))}
+            </div>
+          )}
         </Section>
 
         <Section title={t('settings.tools')} hint={t('settings.toolsHint')}>

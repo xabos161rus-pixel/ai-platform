@@ -34,6 +34,7 @@ check((await p.textContent('body')).includes('демо'), 'демо-провай
 
 // Сквозной сценарий: вопрос → ответ заглушки → метрики
 await p.getByPlaceholder('Спросите что угодно…').fill('Привет, проверка');
+check((await p.textContent('body')).includes('ткн вход'), 'счётчик ≈входа виден при наборе');
 await p.getByRole('button', { name: 'Отправить' }).click();
 await p.waitForTimeout(2000);
 let body = await p.textContent('body');
@@ -56,6 +57,17 @@ await p.waitForTimeout(600);
 body = await p.textContent('body');
 check(body.includes('Провайдеры'), 'настройки открылись');
 check(body.includes('Добавить провайдера'), 'добавление провайдера доступно');
+
+// Бюджет: поле есть, ввод лимита рисует полосу расхода с процентом
+check(body.includes('Месячный бюджет'), 'поле месячного бюджета на месте');
+await p.getByPlaceholder('0').fill('1000');
+await p.waitForTimeout(400);
+check((await p.textContent('body')).includes('% ·'), 'полоса расхода с процентом появилась');
+await p.getByPlaceholder('0').fill('0');
+await p.waitForTimeout(300);
+
+// Статистика: заголовок разбивки по дням (демо-ответ уже дал расход 0 ₽ — есть токены)
+check((await p.textContent('body')).includes('Потрачено за месяц'), 'строка трат месяца на месте');
 await p.getByRole('button', { name: 'Светлая' }).click();
 await p.waitForTimeout(400);
 check(await p.evaluate(() => document.documentElement.classList.contains('light')), 'светлая тема применилась');

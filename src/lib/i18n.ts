@@ -194,6 +194,9 @@ const ru = {
   'settings.contextHint':
     'Сколько последних сообщений уходит в модель. Меньше контекста — дешевле запрос: без ограничения длинный диалог оплачивается целиком каждый раз.',
   'settings.messagesInContext': 'Сообщений в контексте',
+  'settings.spendByDay': 'Расход по дням, 30 дней',
+  'settings.spendByChat': 'Топ чатов за месяц',
+  'settings.spendMonths': 'По месяцам',
   'settings.monthlyBudget': 'Месячный бюджет, ₽',
   'settings.monthlyBudgetHint': '0 — без лимита. На 80% предупреждение, на 100% отправка блокируется',
   'settings.spentThisMonth': 'Потрачено за месяц',
@@ -470,6 +473,9 @@ const en: Record<TKey, string> = {
   'settings.contextHint':
     'How many recent messages go to the model. Less context — cheaper request: without a limit, a long conversation is paid for in full every time.',
   'settings.messagesInContext': 'Messages in context',
+  'settings.spendByDay': 'Daily spend, 30 days',
+  'settings.spendByChat': 'Top chats this month',
+  'settings.spendMonths': 'By month',
   'settings.monthlyBudget': 'Monthly budget, ₽',
   'settings.monthlyBudgetHint': '0 — no limit. Warning at 80%, sending blocks at 100%',
   'settings.spentThisMonth': 'Spent this month',
