@@ -1,9 +1,16 @@
 // Smoke-тест: сквозной сценарий платформы в браузере.
 // Запуск: npm run smoke — единственная автоматическая проверка в проекте.
 import { chromium } from 'playwright';
+import { existsSync } from 'node:fs';
 
 const BASE = 'http://localhost:4174/ai-platform';
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+// В облачной песочнице Chromium лежит по фиксированному пути и авто-поиском
+// Playwright не находится; на обычной машине — ровно наоборот. Хардкод ломал
+// запуск на маке, поэтому явный путь берётся, только если существует.
+const SANDBOX_CHROMIUM = '/opt/pw-browsers/chromium';
+const b = await chromium.launch(
+  existsSync(SANDBOX_CHROMIUM) ? { executablePath: SANDBOX_CHROMIUM } : {},
+);
 // acceptDownloads — иначе событие 'download' для экспорта снапшота не долетает.
 // locale: 'ru-RU' — иначе navigator.language в headless-браузере 'en-US', и
 // resolveLang(undefined) (язык ещё не выбран пользователем) резолвится в
