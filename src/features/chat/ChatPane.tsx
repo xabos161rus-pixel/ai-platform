@@ -148,6 +148,13 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
     [] as Message[],
   );
   const provider = providers.find((p) => p.id === (chat?.providerId ?? settings?.activeProviderId)) ?? null;
+  // Пока работаешь на демо — демо виден; переключился на живого провайдера —
+  // демо-модели исчезают из пикера, чипов, автоподбора и меню регенерации.
+  // Вернуться на демо можно из настроек (там строка живёт всегда).
+  const pickableProviders = useMemo(
+    () => (provider && !provider.isDemo ? providers.filter((p) => !p.isDemo) : providers),
+    [providers, provider],
+  );
   // Активный путь дерева версий — от корня до activeLeafId чата. Для старых
   // линейных чатов (все parentId===undefined) совпадает с messages целиком.
   const path = useMemo(() => buildPath(messages, chat?.activeLeafId), [messages, chat?.activeLeafId]);
@@ -639,7 +646,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
     }
     const keys = settings?.compareModels?.length
       ? settings.compareModels
-      : providers.flatMap((p) => modelIds(p.models).map((x) => `${p.id}:${x}`)).slice(0, 2);
+      : pickableProviders.flatMap((p) => modelIds(p.models).map((x) => `${p.id}:${x}`)).slice(0, 2);
     await db.settings.update('app', { compareMode: m, compareModels: keys, updatedAt: new Date().toISOString() });
   }
 
@@ -673,7 +680,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             <h1 className="truncate text-[0.95rem] font-semibold">{chat ? chat.title || t('chat.newChat') : 'AI Platform'}</h1>
             {chat && (
               <ModelPicker
-                providers={providers}
+                providers={pickableProviders}
                 providerId={chat.providerId}
                 model={chat.model}
                 onChange={(providerId, model) => void patchChat(chat.id, { providerId, model })}
@@ -788,7 +795,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
                   message={item}
                   messages={messages}
                   busy={busy}
-                  providers={providers}
+                  providers={pickableProviders}
                   currentProviderId={chat?.providerId ?? null}
                   currentModel={chat?.model ?? null}
                   canRegenerate={regenerateLeafFor(messages, path, item) !== null}
@@ -837,7 +844,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
           barSlot={
             sendMode !== 'off' ? (
               <CompareBar
-                providers={providers}
+                providers={pickableProviders}
                 picks={settings?.compareModels ?? []}
                 mode={compareMode}
                 onChange={(keys) => void setComparePicks(keys)}

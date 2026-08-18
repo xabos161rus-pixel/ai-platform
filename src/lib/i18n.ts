@@ -293,7 +293,7 @@ const ru = {
   // Приветственные чипы (T8)
   'welcome.chip1': 'Разбери этот документ по пунктам',
   'welcome.chip2': 'Сравни два варианта решения',
-  'welcome.chip3': 'Покажи html-демо страницы',
+  'welcome.chip3': 'Сверстай пример HTML-страницы',
   'welcome.chip4': 'Составь план на сегодня',
   // Свёрнутый сайдбар на широком экране (T8)
   'nav.toggleSidebar': 'Показать чаты',
@@ -590,7 +590,7 @@ const en: Record<TKey, string> = {
   'error.noKeyInternal': 'no key set',
   'welcome.chip1': 'Break down this document point by point',
   'welcome.chip2': 'Compare two possible options',
-  'welcome.chip3': 'Show me an html demo page',
+  'welcome.chip3': 'Build a sample HTML page',
   'welcome.chip4': "Plan out today's schedule",
   'nav.toggleSidebar': 'Show chats',
   'shortcuts.title': 'Keyboard shortcuts',

@@ -184,7 +184,9 @@ export function ChatPage() {
           })
         }
         onToggleCompare={() => {
-          const all = providers.flatMap((p) => modelIds(p.models).map((m) => `${p.id}:${m}`));
+          const active = providers.find((p) => p.id === (chat?.providerId ?? settings?.activeProviderId)) ?? null;
+          const pool = active && !active.isDemo ? providers.filter((p) => !p.isDemo) : providers;
+          const all = pool.flatMap((p) => modelIds(p.models).map((m) => `${p.id}:${m}`));
           void setComparePicks(settings?.compareModels?.length ? [] : all.slice(0, 2));
         }}
         onOpenSettings={() => navigate('/settings')}
