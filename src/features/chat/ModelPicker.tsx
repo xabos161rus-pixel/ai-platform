@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from '../../components/ui/glyphs';
 import type { Provider } from '../../db/types';
 import { modelIds, modelLabel } from '../../lib/ai/models';
 import { useT } from '../../lib/i18n';

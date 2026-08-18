@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { Check, Copy, Crown, Trash2 } from 'lucide-react';
+import { Check, Copy, Crown, Trash2 } from '../../components/ui/glyphs';
 import type { Message } from '../../db/types';
 import { formatCost, modelLabel } from '../../lib/ai/models';
 import { chooseWinner } from '../../lib/ai/chatRepo';

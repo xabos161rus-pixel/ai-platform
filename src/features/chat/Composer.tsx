@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { ArrowUp, FileText, Globe, Paperclip, Square, X } from 'lucide-react';
+import { ArrowUp, FileText, Globe, Paperclip, Square, X } from '../../components/ui/glyphs';
 import { useToast } from '../../components/ui/toastContext';
 import { compressImage, MAX_IMAGES } from '../../lib/images';
 import {

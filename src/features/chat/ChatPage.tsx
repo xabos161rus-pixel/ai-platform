@@ -12,7 +12,7 @@ import {
   Settings,
   Sparkles,
   Trash2,
-} from 'lucide-react';
+} from '../../components/ui/glyphs';
 import { db } from '../../db/db';
 import type { Message, Provider, ToolStep } from '../../db/types';
 import { useToast } from '../../components/ui/toastContext';

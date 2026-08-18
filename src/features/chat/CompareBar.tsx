@@ -1,4 +1,4 @@
-import { Columns2, X } from 'lucide-react';
+import { Columns2, X } from '../../components/ui/glyphs';
 import type { Provider } from '../../db/types';
 import { modelIds, modelLabel } from '../../lib/ai/models';
 import { useT } from '../../lib/i18n';

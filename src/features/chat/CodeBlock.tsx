@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Code2, Copy, Eye, Maximize2, X } from 'lucide-react';
+import { Check, Code2, Copy, Eye, Maximize2, X } from '../../components/ui/glyphs';
 import { useT } from '../../lib/i18n';
 
 /**

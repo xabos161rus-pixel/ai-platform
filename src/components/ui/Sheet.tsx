@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X } from './glyphs';
 import { useT } from '../../lib/i18n';
 
 interface Props {

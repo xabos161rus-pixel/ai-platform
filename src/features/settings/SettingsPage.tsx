@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
-import { ChevronLeft, Cloud, Download, KeyRound, Keyboard, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, Cloud, Download, KeyRound, Keyboard, Pencil, Plus, Trash2, Upload } from '../../components/ui/glyphs';
 import { db, DEMO_PROVIDER_ID } from '../../db/db';
 import type { Provider, Snippet, SyncConfig } from '../../db/types';
 import { alive, now, stamp } from '../../lib/repo';

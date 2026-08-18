@@ -15,7 +15,7 @@ import {
   Settings,
   Trash2,
   X,
-} from 'lucide-react';
+} from '../../components/ui/glyphs';
 import type { Chat } from '../../db/types';
 import { listFolders, patchChat, removeChat } from '../../lib/ai/chatRepo';
 import { searchAll, type SearchHit } from '../../lib/search';

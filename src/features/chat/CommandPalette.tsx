@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Columns2, CornerDownLeft, Keyboard, MessageSquare, MessageSquarePlus, Moon, Search, Settings, Sun } from 'lucide-react';
+import { Columns2, CornerDownLeft, Keyboard, MessageSquare, MessageSquarePlus, Moon, Search, Settings, Sun } from '../../components/ui/glyphs';
 import type { Chat, Provider } from '../../db/types';
 import { modelIds, modelLabel } from '../../lib/ai/models';
 import { searchAll, type SearchHit } from '../../lib/search';

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Check } from 'lucide-react';
+import { Check } from '../../components/ui/glyphs';
 import type { Provider } from '../../db/types';
 import { modelEntries, modelLabel } from '../../lib/ai/models';
 import { useT } from '../../lib/i18n';

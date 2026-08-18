@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from '../../components/ui/glyphs';
 import type { Message } from '../../db/types';
 import { siblingsOf, switchSibling } from '../../lib/ai/tree';
 import { useT } from '../../lib/i18n';

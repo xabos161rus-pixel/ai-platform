@@ -2,7 +2,7 @@
 // ChatPage дал бы цикл (CompareGroup рендерится внутри ChatPage).
 
 import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '../../components/ui/glyphs';
 import { useT } from '../../lib/i18n';
 
 /** Свёрнутый по умолчанию блок «мыслей» готового ответа. */

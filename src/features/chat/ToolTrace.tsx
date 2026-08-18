@@ -7,7 +7,7 @@
 // местах ленты — импорт из ChatPage дал бы цикл.
 
 import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight } from '../../components/ui/glyphs';
 import type { ToolStep } from '../../db/types';
 import { useT, type TKey } from '../../lib/i18n';
 
