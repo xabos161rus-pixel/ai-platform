@@ -842,6 +842,22 @@ check((await p.textContent('body')).includes('Консилиум ·'), 'конс
 // Чистим режим, чтобы не влиять на будущие прогоны смоука.
 await p.getByRole('button', { name: 'колонки' }).click().catch(() => {});
 
+// СПЛИТ: второй чат рядом (десктоп): из меню строки сайдбара, полная
+// независимость панелей, закрытие крестиком.
+await p.setViewportSize({ width: 1400, height: 800 });
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(600);
+const menuBtns = p.locator('button:has(.glyph-more-h)');
+await menuBtns.last().click();
+await p.waitForTimeout(300);
+await p.getByRole('button', { name: 'Открыть рядом' }).click();
+await p.waitForTimeout(600);
+check((await p.locator('header').count()) === 2, 'сплит: две панели с шапками');
+check((await p.locator('textarea').count()) === 2, 'сплит: у каждой панели свой композер');
+await p.getByRole('button', { name: 'Закрыть панель' }).click();
+await p.waitForTimeout(400);
+check((await p.locator('header').count()) === 1, 'сплит: панель закрылась крестиком');
+
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
 

@@ -7,6 +7,7 @@ import {
   Folder,
   FolderInput,
   SquarePen,
+  Columns2,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -31,6 +32,8 @@ interface Props {
   onClose?: () => void;
   /** Свёрнута ли постоянная колонка на широком экране (⌘B). Оверлей не касается. */
   sidebarCollapsed?: boolean;
+  /** Открыть чат второй панелью (сплит). Нет пропа — пункта меню нет. */
+  onOpenSplit?: (id: string) => void;
 }
 
 /** Строка меню, открытого над конкретным чатом: сам чат + место клика для позиционирования портала. */
@@ -87,7 +90,7 @@ const COLLAPSED_KEY = 'ai-platform.collapsedFolders';
  * на маке нижняя панель вместо колонки ощущается как мобильное приложение,
  * растянутое на десктоп.
  */
-export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClose, sidebarCollapsed = false }: Props) {
+export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClose, sidebarCollapsed = false, onOpenSplit }: Props) {
   const t = useT();
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -299,6 +302,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
           folderNames={folderNames}
           onClose={() => setMenuFor(null)}
           onRename={() => setRenamingId(menuFor.chat.id)}
+          onOpenSplit={onOpenSplit}
         />
       )}
     </aside>
@@ -388,12 +392,14 @@ function RowMenu({
   folderNames,
   onClose,
   onRename,
+  onOpenSplit,
 }: {
   chat: Chat;
   rect: DOMRect;
   folderNames: string[];
   onClose: () => void;
   onRename: () => void;
+  onOpenSplit?: (id: string) => void;
 }) {
   const t = useT();
   const [view, setView] = useState<'root' | 'folders'>('root');
@@ -424,6 +430,19 @@ function RowMenu({
       >
         {view === 'root' ? (
           <>
+            {/* Сплит — только широкий экран: на узком второй панели некуда встать. */}
+            {onOpenSplit && (
+              <button
+                className={`${itemClass} max-xl:hidden`}
+                onClick={() => {
+                  onOpenSplit(chat.id);
+                  onClose();
+                }}
+              >
+                <Columns2 size={15} className="text-muted" />
+                {t('split.openAria')}
+              </button>
+            )}
             <button
               className={itemClass}
               onClick={() => {
