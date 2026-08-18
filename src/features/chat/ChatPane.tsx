@@ -593,6 +593,17 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
     URL.revokeObjectURL(url);
   }
 
+  // Заголовок вкладки — название активного чата: среди десятка вкладок
+  // браузера свою находят по имени разговора, а не по имени приложения.
+  // Ведёт главная панель; сплит-панель вкладку не переименовывает.
+  useEffect(() => {
+    if (!primary) return;
+    document.title = chat?.title ? `${chat.title} — AI Platform` : 'AI Platform';
+    return () => {
+      document.title = 'AI Platform';
+    };
+  }, [primary, chat?.title]);
+
   // Esc: остановить генерацию этой панели, иначе закрыть просмотрщик её
   // изображения. Глобальные хоткеи (⌘K/⌘N/⌘B/⌘/) живут в ChatPage.
   useEffect(() => {
@@ -872,7 +883,7 @@ function Welcome({ demo, onPick }: { demo: boolean; onPick: (text: string) => vo
           <button
             key={chip}
             onClick={() => onPick(chip)}
-            className="min-h-[var(--cc-touch)] rounded-full border border-hairline px-3 py-2 text-sm transition-colors hover:border-accent active:opacity-70"
+            className="min-h-[var(--cc-touch)] rounded-full border border-hairline bg-surface-2/50 px-3.5 py-2 text-sm transition-colors hover:border-accent hover:text-accent active:opacity-70"
           >
             {chip}
           </button>

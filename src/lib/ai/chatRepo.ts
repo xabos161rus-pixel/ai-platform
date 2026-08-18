@@ -4,7 +4,7 @@ import type { BaseEntity, Chat, Message, Provider, ToolStep } from '../../db/typ
 import { costRub } from './models';
 import type { ChatMessage, Reply } from './client';
 import { buildPath, leafAfterRemoval, nodeOf, parentMap, subtreeIds } from './tree';
-import { t } from '../i18n';
+import { getLang, t } from '../i18n';
 import type { AttachedFile } from '../files';
 
 /** Заголовок чата из первого вопроса — короткая первая строка без хвостов. */
@@ -352,7 +352,7 @@ export function listFolders(chats: Chat[]): string[] {
 
 /** Экспорт диалога в markdown — страховка от потери устройства. */
 export function exportMarkdown(chat: Chat, messages: Message[]): string {
-  const head = `# ${chat.title}\n\n_${new Date(chat.createdAt).toLocaleString('ru-RU')}_\n`;
+  const head = `# ${chat.title}\n\n_${new Date(chat.createdAt).toLocaleString(getLang() === 'ru' ? 'ru-RU' : 'en-US')}_\n`;
   const body = messages
     .map((m) => {
       if (m.status === 'error') return t('chat.errorPrefix', { error: m.error ?? '' });
