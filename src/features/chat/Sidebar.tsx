@@ -6,7 +6,7 @@ import {
   ChevronRight,
   Folder,
   FolderInput,
-  MessageSquarePlus,
+  SquarePen,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -154,14 +154,16 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
       }`}
     >
       <div className="flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+10px)] pb-2">
-        {/* Сдержанная, а не залитая акцентом: кнопка не должна кричать громче
-            содержимого — акцент в этом языке работает точечно. */}
+        {/* Лёгкая строка, а не рамочная плита: рамка на всю ширину сайдбара
+            весила больше содержимого. Ховер — мягкий фон, перо подкрашивается
+            акцентом, хоткей — тихой подписью справа (только с клавиатурой). */}
         <button
           onClick={onNew}
-          className="flex min-h-[var(--cc-touch)] flex-1 items-center gap-2 rounded-[var(--cc-radius)] border border-hairline px-3 text-sm font-medium transition-colors hover:border-accent hover:text-accent active:opacity-70"
+          className="group flex min-h-[var(--cc-touch)] flex-1 items-center gap-2.5 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium transition-colors hover:bg-[var(--cc-fill-ghost-hover)] active:opacity-70"
         >
-          <MessageSquarePlus size={17} />
+          <SquarePen size={16} className="text-muted transition-colors group-hover:text-accent" />
           {t('chat.newChat')}
+          <kbd className="ml-auto hidden font-mono text-[length:var(--cc-text-caption)] font-normal text-muted/50 lg:inline">⌘N</kbd>
         </button>
         {overlay && (
           <button

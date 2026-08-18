@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
-import { ChevronLeft, Cloud, Download, KeyRound, Keyboard, Pencil, Plus, Trash2, Upload } from '../../components/ui/glyphs';
+import { ChevronLeft, Cloud, Download, Keyboard, Pencil, Plus, Trash2, Upload } from '../../components/ui/glyphs';
 import { db, DEMO_PROVIDER_ID } from '../../db/db';
 import type { Provider, Snippet, SyncConfig } from '../../db/types';
 import { alive, now, stamp } from '../../lib/repo';
@@ -155,16 +155,24 @@ export function SettingsPage() {
         <h1 className="flex-1 text-[0.95rem] font-semibold">{t('nav.settings')}</h1>
       </header>
 
-      <div className="cc-scroll mx-auto w-full max-w-3xl flex-1 space-y-6 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">
+      <div className="cc-scroll mx-auto w-full max-w-3xl flex-1 space-y-8 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">
         <Section title={t('settings.providers')} hint={t('settings.providersHint')}>
           <div className="space-y-1.5">
             {providers.map((p) => (
               <div
                 key={p.id}
-                className={`flex items-center gap-2 rounded-[var(--cc-radius)] border px-3 py-2.5 ${
-                  settings.activeProviderId === p.id ? 'border-accent' : 'border-hairline'
+                className={`group flex items-center gap-2.5 rounded-[var(--cc-radius)] border border-hairline px-3 py-2.5 transition-colors ${
+                  settings.activeProviderId === p.id ? 'bg-surface-2' : 'hover:bg-[var(--cc-fill-ghost-hover)]'
                 }`}
               >
+                {/* Активность — клай-точкой, тем же маркером, что у ответов в
+                    чате: рамка на всю карточку кричала громче содержимого. */}
+                <span
+                  aria-hidden
+                  className={`size-1.5 shrink-0 rounded-full transition-colors ${
+                    settings.activeProviderId === p.id ? 'bg-accent' : 'bg-hairline'
+                  }`}
+                />
                 <button
                   className="min-w-0 flex-1 text-left active:opacity-60"
                   onClick={() => void patchSettings({ activeProviderId: p.id, defaultModel: modelIds(p.models)[0] ?? 'demo-echo' })}
@@ -178,42 +186,43 @@ export function SettingsPage() {
                   <>
                     <button
                       aria-label={t('settings.editAria')}
-                      className="grid size-9 place-items-center text-muted active:opacity-60"
+                      title={t('settings.editAria')}
+                      className="grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text active:opacity-60"
                       onClick={() => setEditing(p)}
                     >
-                      <KeyRound size={16} />
+                      <Pencil size={15} />
                     </button>
                     <button
                       aria-label={t('settings.deleteAria')}
-                      className="grid size-9 place-items-center text-muted active:opacity-60"
+                      title={t('settings.deleteAria')}
+                      className="grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-danger active:opacity-60"
                       onClick={() => void handleRemoveProvider(p)}
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </>
                 )}
               </div>
             ))}
           </div>
-          <Button
-            variant="secondary"
-            className="mt-2 inline-flex w-full items-center justify-center gap-2"
+          <button
             onClick={() => setAdding(true)}
+            className="mt-1 flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             {t('settings.addProvider')}
-          </Button>
+          </button>
         </Section>
 
         <Section title={t('settings.appearance')}>
-          <div className="flex rounded-[var(--cc-radius)] bg-surface-2 p-1">
+          <div className="inline-flex rounded-[var(--cc-radius)] bg-surface-2 p-1">
             {(['dark', 'light', 'system'] as const).map((theme) => (
               <button
                 key={theme}
                 aria-pressed={settings.theme === theme}
                 onClick={() => void patchSettings({ theme })}
-                className={`flex-1 rounded-[var(--cc-radius-sm)] py-2 text-sm font-medium transition-all ${
-                  settings.theme === theme ? 'bg-accent text-white' : 'text-muted'
+                className={`rounded-[var(--cc-radius-sm)] px-4 py-1.5 text-sm font-medium transition-all ${
+                  settings.theme === theme ? 'bg-accent text-white' : 'text-muted hover:text-text'
                 }`}
               >
                 {theme === 'dark' ? t('settings.theme.dark') : theme === 'light' ? t('settings.theme.light') : t('settings.system')}
@@ -223,14 +232,14 @@ export function SettingsPage() {
         </Section>
 
         <Section title={t('settings.language')}>
-          <div className="flex rounded-[var(--cc-radius)] bg-surface-2 p-1">
+          <div className="inline-flex rounded-[var(--cc-radius)] bg-surface-2 p-1">
             {(['ru', 'en', 'system'] as const).map((lang) => (
               <button
                 key={lang}
                 aria-pressed={(settings.language ?? 'system') === lang}
                 onClick={() => void patchSettings({ language: lang })}
-                className={`flex-1 rounded-[var(--cc-radius-sm)] py-2 text-sm font-medium transition-all ${
-                  (settings.language ?? 'system') === lang ? 'bg-accent text-white' : 'text-muted'
+                className={`rounded-[var(--cc-radius-sm)] px-4 py-1.5 text-sm font-medium transition-all ${
+                  (settings.language ?? 'system') === lang ? 'bg-accent text-white' : 'text-muted hover:text-text'
                 }`}
               >
                 {lang === 'ru' ? 'Русский' : lang === 'en' ? 'English' : t('settings.system')}
@@ -387,14 +396,13 @@ export function SettingsPage() {
 
         <Section title={t('sync.title')} hint={t('sync.hint')}>
           <p className="mb-2 text-sm text-muted">{syncStatusText(t, syncCfg)}</p>
-          <Button
-            variant="secondary"
-            className="inline-flex w-full items-center justify-center gap-2"
+          <button
             onClick={() => setSyncOpen(true)}
+            className="flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
           >
-            <Cloud size={18} />
+            <Cloud size={16} />
             {t('sync.configure')}
-          </Button>
+          </button>
         </Section>
 
         <Section title={t('snippets.title')} hint={t('snippets.hint')}>
@@ -424,14 +432,13 @@ export function SettingsPage() {
               </div>
             ))}
           </div>
-          <Button
-            variant="secondary"
-            className="mt-2 inline-flex w-full items-center justify-center gap-2"
+          <button
             onClick={() => setAddingSnippet(true)}
+            className="mt-1 flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             {t('snippets.add')}
-          </Button>
+          </button>
         </Section>
 
         <Section title={t('settings.data')} hint={t('settings.dataHint')}>
@@ -521,8 +528,12 @@ export function SettingsPage() {
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-1 text-sm font-semibold">{title}</h2>
-      {hint && <p className="mb-2.5 text-[length:var(--cc-text-meta)] leading-relaxed text-muted">{hint}</p>}
+      {/* Заголовок — тихими капсами, как маркировка, а не крик: у настроек
+          иерархию несёт воздух между секциями, не вес заголовков. */}
+      <h2 className="mb-2 font-mono text-[length:var(--cc-text-caption)] font-medium tracking-[0.08em] text-muted uppercase">
+        {title}
+      </h2>
+      {hint && <p className="-mt-1 mb-2.5 text-[length:var(--cc-text-meta)] leading-relaxed text-muted">{hint}</p>}
       {children}
     </section>
   );

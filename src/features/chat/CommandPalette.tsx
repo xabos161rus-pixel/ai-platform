@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Columns2, CornerDownLeft, Keyboard, MessageSquare, MessageSquarePlus, Moon, Search, Settings, Sun } from '../../components/ui/glyphs';
+import { Columns2, CornerDownLeft, Keyboard, MessageSquare, SquarePen, Moon, Search, Settings, Sun } from '../../components/ui/glyphs';
 import type { Chat, Provider } from '../../db/types';
 import { modelIds, modelLabel } from '../../lib/ai/models';
 import { searchAll, type SearchHit } from '../../lib/search';
@@ -78,7 +78,7 @@ function Palette({
 
   const commands = useMemo<Command[]>(() => {
     const base: Command[] = [
-      { id: 'new', label: t('chat.newChat'), hint: '⌘N', icon: MessageSquarePlus, run: onNewChat },
+      { id: 'new', label: t('chat.newChat'), hint: '⌘N', icon: SquarePen, run: onNewChat },
       { id: 'compare', label: t('palette.compareMode'), icon: Columns2, run: onToggleCompare },
       { id: 'theme', label: t('palette.toggleTheme'), icon: Moon, run: onToggleTheme },
       { id: 'settings', label: t('nav.settings'), icon: Settings, run: onOpenSettings },
