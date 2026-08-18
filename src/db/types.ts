@@ -77,6 +77,14 @@ export interface Message extends BaseEntity {
   runIndex?: number;
   /** Победитель прогона — его ответ уходит в контекст. */
   chosen?: boolean;
+  /**
+   * Стадия консилиума (runId = id прогона консилиума): 'opinion' — первое
+   * мнение модели, 'debate' — ответ после взаимной критики, 'review' —
+   * ранжирование чужих ответов (JSON в content), 'final' — свод
+   * председателя (он же chosen — уходит в контекст). Обычные сообщения и
+   * сравнение — без поля.
+   */
+  councilStage?: 'opinion' | 'debate' | 'review' | 'final';
   /** Вложенные картинки: сжатые JPEG dataURL (≤1024px по длинной стороне, ≤4 шт). Только у сообщений пользователя. */
   images?: string[];
   /** Рассуждения модели (reasoning_content/reasoning из потока). Нет поля — модель мысли не шлёт. */
@@ -142,6 +150,8 @@ export interface Settings {
   defaultModel: string;
   /** Модели для режима сравнения: `providerId:model`. Пусто — режим выключен. */
   compareModels?: string[];
+  /** Что делать с выбранными моделями: колонки бок о бок или консилиум. */
+  compareMode?: 'columns' | 'council';
   // Сколько последних сообщений уходит в модель. Прямой контроль расхода:
   // длинный диалог иначе оплачивается целиком на каждом вопросе.
   historyLimit: number;

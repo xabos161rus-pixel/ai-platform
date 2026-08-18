@@ -375,8 +375,18 @@ async function streamDemo(
   onDelta: OnDelta,
   signal?: AbortSignal,
   onReasoning?: OnDelta,
+  instant?: boolean,
 ): Promise<Reply> {
   const full = demoReply(messages, systemPrompt, model);
+  // Мгновенный режим — для стадий, которые никто не смотрит в реальном
+  // времени (промежуточные ответы консилиума): честная задержка стрима там
+  // превращала демо-прогон в минуты ожидания на ровном месте.
+  if (instant) {
+    if (signal?.aborted) throw new AiError('aborted', t('error.abortedInternal'));
+    await new Promise((r) => setTimeout(r, 60));
+    onDelta(full.content);
+    return full;
+  }
   if (full.reasoning && onReasoning) {
     const thinkParts = full.reasoning.match(/\S+\s*/g) ?? [full.reasoning];
     for (const part of thinkParts) {
@@ -414,11 +424,13 @@ export async function streamChat(params: {
   tools?: WireTool[];
   /** Готовые wire-сообщения агентского цикла (ответы assistant с tool_calls + role:'tool'), добавляются после toWire(messages) как есть. */
   wireTail?: WireAgentMsg[];
+  /** Демо без задержки стрима — для стадий, которые не смотрят в реальном времени (консилиум). Живых провайдеров не касается. */
+  demoInstant?: boolean;
 }): Promise<Reply> {
-  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, tools, wireTail } = params;
+  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, tools, wireTail, demoInstant } = params;
   if (!provider) throw new AiError('no_provider', t('error.noProviderInternal'));
   // Демо-путь параметры игнорирует — заглушка не читает temperature/maxTokens/tools.
-  if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal, onReasoning);
+  if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal, onReasoning, demoInstant);
   if (!provider.apiKey) throw new AiError('no_key', t('error.noKeyInternal'));
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;

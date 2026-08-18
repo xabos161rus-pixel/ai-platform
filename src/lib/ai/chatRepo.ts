@@ -170,6 +170,8 @@ export async function addAssistantMessage(
   opts?: {
     /** Группа сравнения: один вопрос → несколько моделей, сиблинги с общим runId. */
     run?: { runId: string; runIndex: number; chosen?: boolean };
+    /** Стадия консилиума — для сообщений его прогона (runId = id прогона). */
+    councilStage?: 'opinion' | 'debate' | 'review' | 'final';
     parentId?: string | null;
     /** Цена провайдера смотрится раньше встроенного реестра — см. costRub. */
     provider?: Provider | null;
@@ -199,8 +201,11 @@ export async function addAssistantMessage(
       reasoning: reply.reasoning || undefined,
       parentId: opts?.parentId,
       toolTrace: opts?.toolTrace?.length ? opts.toolTrace : undefined,
+      councilStage: opts?.councilStage,
     },
-    { asActiveLeaf: !opts?.run || opts.run.runIndex === 0 },
+    // Лист двигают обычный ответ, первая колонка сравнения и ФИНАЛ консилиума;
+    // промежуточные стадии консилиума указатель активной ветки не трогают.
+    { asActiveLeaf: opts?.councilStage ? opts.councilStage === 'final' : !opts?.run || opts.run.runIndex === 0 },
   );
   return row;
 }

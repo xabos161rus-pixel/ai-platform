@@ -490,7 +490,7 @@ export function SettingsPage() {
       <ProviderSheet
         // key перемонтирует форму при каждом открытии — так поля берут
         // значения из пропсов без setState в эффекте.
-        key={editing?.id ?? (adding ? 'new' : 'closed')}
+        key={editing?.id ?? (adding ? 'provider-new' : 'provider-closed')}
         open={adding || editing !== null}
         provider={editing}
         onClose={() => {
@@ -502,7 +502,7 @@ export function SettingsPage() {
 
       <SnippetSheet
         // key перемонтирует форму при каждом открытии — тот же паттерн, что у ProviderSheet.
-        key={editingSnippet?.id ?? (addingSnippet ? 'new' : 'closed')}
+        key={editingSnippet?.id ?? (addingSnippet ? 'snippet-new' : 'snippet-closed')}
         open={addingSnippet || editingSnippet !== null}
         snippet={editingSnippet}
         onClose={() => {
@@ -514,7 +514,7 @@ export function SettingsPage() {
 
       <SyncSheet
         // key перемонтирует форму при каждом открытии — тот же паттерн, что у ProviderSheet/SnippetSheet.
-        key={syncOpen ? 'open' : 'closed'}
+        key={syncOpen ? 'sync-open' : 'sync-closed'}
         open={syncOpen}
         cfg={syncCfg}
         onClose={() => setSyncOpen(false)}

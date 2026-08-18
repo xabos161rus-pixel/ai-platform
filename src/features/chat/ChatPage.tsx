@@ -19,6 +19,7 @@ import { useToast } from '../../components/ui/toastContext';
 import { streamChat, errorText, type Reply } from '../../lib/ai/client';
 import { runAgent, RESEARCH_SYSTEM } from '../../lib/ai/agentLoop';
 import { buildTools } from '../../lib/ai/tools';
+import { runCouncil, type CouncilStage } from '../../lib/ai/council';
 import { estimateTokens, formatCost, formatTokens, modelIds, modelLabel, priceInFor } from '../../lib/ai/models';
 import {
   addAssistantMessage,
@@ -43,6 +44,7 @@ import { ToolTrace } from './ToolTrace';
 import { Sidebar } from './Sidebar';
 import { ModelPicker } from './ModelPicker';
 import { CompareGroup } from './CompareGroup';
+import { CouncilGroup } from './CouncilGroup';
 import { CompareBar } from './CompareBar';
 import { CommandPalette } from './CommandPalette';
 import { PersonaSheet } from './PersonaSheet';
@@ -93,6 +95,8 @@ export function ChatPage() {
   const [agentSteps, setAgentSteps] = useState<ToolStep[]>([]);
   // Потоки колонок сравнения: индекс колонки → накопленный текст.
   const [compareStream, setCompareStream] = useState<Record<number, string>>({});
+  // Идущая стадия консилиума — для строки прогресса; null — консилиум не идёт.
+  const [councilStage, setCouncilStage] = useState<CouncilStage | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -131,6 +135,29 @@ export function ChatPage() {
   // Активный путь дерева версий — от корня до activeLeafId чата. Для старых
   // линейных чатов (все parentId===undefined) совпадает с messages целиком.
   const path = useMemo(() => buildPath(messages, chat?.activeLeafId), [messages, chat?.activeLeafId]);
+  // Council-прогоны: финал живёт в пути, промежуточные стадии — его сиблинги
+  // ВНЕ пути. Собираем группы по runId один раз; прогон без финала (оборван
+  // перезагрузкой) прикрепляется к своему вопросу как «осиротевший».
+  const councilByRun = useMemo(() => {
+    const map = new Map<string, Message[]>();
+    for (const m of messages) {
+      if (!m.runId || !m.councilStage || m.deletedAt) continue;
+      const arr = map.get(m.runId) ?? [];
+      arr.push(m);
+      map.set(m.runId, arr);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => (a.runIndex ?? 0) - (b.runIndex ?? 0));
+    return map;
+  }, [messages]);
+  const councilOrphans = useMemo(() => {
+    const byQuestion = new Map<string, Message[]>();
+    for (const arr of councilByRun.values()) {
+      if (arr.some((m) => m.councilStage === 'final')) continue;
+      const q = arr[0]?.parentId;
+      if (q) byQuestion.set(q, arr);
+    }
+    return byQuestion;
+  }, [councilByRun]);
   // Примитивы вместо целого объекта settings в зависимостях ask/askCompare:
   // settings — один Dexie-объект, и смена ЛЮБОГО его поля (тема, язык) даёт
   // новую ссылку целиком. Если зависеть от объекта, ask/askCompare
@@ -387,6 +414,79 @@ export function ChatPage() {
     [chat, hasSettings, historyLimit, providers, passBudget],
   );
 
+  /**
+   * Консилиум: выбранные модели отвечают, критикуют друг друга анонимно,
+   * ранжируют и председатель (активная модель чата) сводит финал. Все стадии
+   * пишутся в Dexie по готовности одной runId-группой; финал — chosen, и в
+   * контекст следующего вопроса уходит только он (логика победителя уже так
+   * работает для сравнения).
+   */
+  const askCouncil = useCallback(
+    async (picks: { providerId: string; model: string }[], opts: { leafId: string; question: string }) => {
+      if (!chat || !hasSettings || picks.length < 2) return;
+      const paid = picks.map((pk) => providers.find((p) => p.id === pk.providerId) ?? null).find((p) => p && !p.isDemo);
+      if (paid && !(await passBudget(paid))) return;
+      setBusy(true);
+      setStreamText('');
+      setCouncilStage('opinion');
+      const ac = new AbortController();
+      abortRef.current = ac;
+      const councilId = uid();
+      const n = picks.length;
+      try {
+        const questionId = opts.leafId;
+        const history = toContext(await chatMessages(chat.id), historyLimit, questionId);
+        const councilPicks = picks.map((pk) => ({ provider: providers.find((p) => p.id === pk.providerId) ?? null, model: pk.model }));
+        const chairman = { provider: providers.find((p) => p.id === chat.providerId) ?? null, model: chat.model };
+        let partial = '';
+        const { final } = await runCouncil({
+          picks: councilPicks,
+          chairman,
+          history,
+          systemPrompt: chat.systemPrompt,
+          question: opts.question,
+          signal: ac.signal,
+          temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+          maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
+          cb: {
+            onStage: (st) => setCouncilStage(st),
+            onStageResult: async (stage, r) => {
+              // Индексы стадий разнесены по десяткам: порядок в группе стабилен
+              // и никогда не спорит с runIndex финала.
+              const base = stage === 'opinion' ? 0 : stage === 'debate' ? n : n * 2;
+              await addAssistantMessage(chat.id, r.reply, {
+                run: { runId: councilId, runIndex: base + r.pickIndex },
+                councilStage: stage,
+                provider: councilPicks[r.pickIndex]?.provider ?? null,
+                parentId: questionId,
+              });
+            },
+            onDelta: (piece) => {
+              partial += piece;
+              setStreamText(partial);
+            },
+          },
+        });
+        await addAssistantMessage(chat.id, final, {
+          run: { runId: councilId, runIndex: n * 3, chosen: true },
+          councilStage: 'final',
+          provider: chairman.provider,
+          parentId: questionId,
+        });
+      } catch (e) {
+        const msg = e instanceof Error && e.message.startsWith('council:') ? t('council.allFailed') : errorText(e);
+        await addErrorMessage(chat.id, msg, { parentId: (await db.chats.get(chat.id))?.activeLeafId ?? null });
+      } finally {
+        abortRef.current = null;
+        setBusy(false);
+        setStreamText('');
+        setCouncilStage(null);
+        scheduleSyncSoon();
+      }
+    },
+    [chat, hasSettings, historyLimit, providers, passBudget],
+  );
+
   /** Отправка из композера: черновик, картинки и файлы уже очищены им самим. */
   async function handleSend(text: string, images: string[], files: AttachedFile[]) {
     if (!chat) return;
@@ -395,7 +495,8 @@ export function ChatPage() {
       images: images.length ? images : undefined,
       files: files.length ? files : undefined,
     });
-    if (comparePicks.length > 1) await askCompare(comparePicks, { leafId: msg.id });
+    if (comparePicks.length > 1 && compareMode === 'council') await askCouncil(comparePicks, { leafId: msg.id, question: text });
+    else if (comparePicks.length > 1) await askCompare(comparePicks, { leafId: msg.id });
     else await ask({ leafId: msg.id });
     composerRef.current?.focus();
   }
@@ -532,6 +633,7 @@ export function ChatPage() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const compareMode = settings?.compareMode ?? 'columns';
   const comparePicks = (settings?.compareModels ?? [])
     .map((k) => {
       const [providerId, ...rest] = k.split(':');
@@ -667,7 +769,11 @@ export function ChatPage() {
                 по себе проваливает поверхностное сравнение. Компонент сам
                 прикладывает к ним свой message/id при вызове. */}
             {groupRuns(path).map((item) =>
-              Array.isArray(item) ? (
+              !Array.isArray(item) && item.councilStage === 'final' ? (
+                <CouncilGroup key={item.id} group={councilByRun.get(item.runId ?? '') ?? [item]} onCopy={copyText} />
+              ) : Array.isArray(item) && item.some((m) => m.councilStage) ? (
+                <CouncilGroup key={item[0].id} group={councilByRun.get(item[0].runId ?? '') ?? item} onCopy={copyText} />
+              ) : Array.isArray(item) ? (
                 <CompareGroup
                   key={item[0].id}
                   group={item}
@@ -678,8 +784,8 @@ export function ChatPage() {
                   onDeleteBranch={handleDeleteBranch}
                 />
               ) : item.role === 'user' ? (
+                <div key={item.id} className="contents">
                 <UserBubble
-                  key={item.id}
                   message={item}
                   messages={messages}
                   busy={busy}
@@ -691,6 +797,13 @@ export function ChatPage() {
                   onView={setViewer}
                   onCopy={copyText}
                 />
+                {/* Прогон консилиума, оборванный до финала (перезагрузка
+                    посреди свода): показываем собранные стадии под вопросом,
+                    иначе они невидимы — активный лист остался на вопросе. */}
+                {!busy && councilOrphans.has(nodeOf(messages, item).id) && (
+                  <CouncilGroup group={councilOrphans.get(nodeOf(messages, item).id)!} onCopy={copyText} />
+                )}
+                </div>
               ) : (
                 <AssistantBlock
                   key={item.id}
@@ -708,7 +821,18 @@ export function ChatPage() {
                 />
               ),
             )}
-            {busy &&
+            {busy && councilStage && (
+              <div className="animate-msg-in grid grid-cols-[var(--cc-marker-col)_1fr]">
+                <div aria-hidden className="pt-[0.55rem]">
+                  <span className="block size-1.5 animate-pulse rounded-full bg-accent" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-mono text-[length:var(--cc-text-caption)] text-muted">{t(`council.stage.${councilStage}`)}</p>
+                  {councilStage === 'final' && streamText && <Markdown text={streamText} />}
+                </div>
+              </div>
+            )}
+            {busy && !councilStage &&
               (comparePicks.length > 1 ? (
                 <StreamingCompare picks={comparePicks} texts={compareStream} />
               ) : (
@@ -734,7 +858,9 @@ export function ChatPage() {
             <CompareBar
               providers={providers}
               picks={settings?.compareModels ?? []}
+              mode={compareMode}
               onChange={(keys) => void setComparePicks(keys)}
+              onMode={(m) => void db.settings.update('app', { compareMode: m, updatedAt: new Date().toISOString() })}
             />
           }
         />

@@ -788,6 +788,60 @@ await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
 await p.waitForTimeout(500);
 check(!(await p.textContent('body')).includes('Времянка'), 'провайдеры: «Времянка» не вернулась после перезагрузки настроек (deletedAt в базе, а не фильтр рендера)');
 
+// КОНСИЛИУМ: выбранные модели обсуждают вопрос и председатель сводит итог.
+// Полный прогон на демо занимает минуты (стрим по словам) — смоук проверяет
+// запуск тракта: режим включается, прогресс-строка идёт, стадия «мнения»
+// докладывает результаты в базу; после перезагрузки оборванный прогон виден
+// свёрнутым блоком (финал не потерян молча).
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Новый чат' }).first().click();
+await p.waitForTimeout(400);
+await p.getByRole('button', { name: 'сравнить' }).click();
+await p.waitForTimeout(300);
+// «сравнить» авто-выбирает первые две модели из ВСЕХ провайдеров — в смоуке
+// это модели временного tmp-1 без ключа. Консилиуму нужны демо: снимаем
+// чужие чипы, включаем оба демо. Целимся по testid: имена моделей дублируются
+// с кнопкой пикера в шапке, и строковый локатор скакал между ними.
+for (const key of ['tmp-1:model-a', 'tmp-1:model-b']) {
+  const chip = p.getByTestId(`compare-chip:${key}`);
+  if ((await chip.count()) && (await chip.getAttribute('class'))?.includes('border-accent')) {
+    await chip.click();
+    await p.waitForTimeout(150);
+  }
+}
+for (const key of ['demo:demo-echo', 'demo:demo-fast']) {
+  const chip = p.getByTestId(`compare-chip:${key}`);
+  if (!((await chip.getAttribute('class'))?.includes('border-accent'))) {
+    await chip.click();
+    await p.waitForTimeout(150);
+  }
+}
+await p.waitForTimeout(200);
+await p.getByRole('button', { name: 'консилиум' }).click();
+await p.waitForTimeout(200);
+await p.getByPlaceholder('Спросите что угодно…').fill('вопрос для консилиума');
+await p.getByRole('button', { name: 'Отправить' }).click();
+await p.waitForTimeout(600);
+// Демо-стадии мгновенные: к моменту проверки прогон может быть на любой
+// стадии вплоть до финального свода — принимаем любую из строк прогресса.
+check(/Консилиум:|Председатель сводит/.test(await p.textContent('body')), 'консилиум: прогресс стадии виден после отправки');
+// Смена стадии в прогрессе доказывает, что мнения дошли и прогон движется.
+// Через import('/src/…') в прод-сборке базу не потрогать — проверяем текстом.
+const advanced = await p
+  .waitForFunction(
+    () => /Консилиум: (дебаты|взаимное ранжирование)|Председатель сводит/.test(document.body.textContent ?? ''),
+    { timeout: 45_000 },
+  )
+  .then(() => true)
+  .catch(() => false);
+check(advanced, 'консилиум: стадия сменилась — мнения собраны, прогон движется');
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(800);
+check((await p.textContent('body')).includes('Консилиум ·'), 'консилиум: оборванный прогон виден блоком после перезагрузки');
+// Чистим режим, чтобы не влиять на будущие прогоны смоука.
+await p.getByRole('button', { name: 'колонки' }).click().catch(() => {});
+
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
 

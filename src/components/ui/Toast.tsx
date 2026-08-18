@@ -16,7 +16,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {text && (
         <div className="animate-fade-in pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+84px)] z-[60] flex justify-center px-4">
-          <div className="max-w-sm rounded-[var(--cc-radius)] bg-surface-2 px-4 py-2.5 text-center text-sm shadow-[var(--shadow-pop)]">
+          <div className="max-w-sm rounded-[var(--cc-radius)] border border-hairline bg-elevated px-4 py-2.5 text-center text-sm shadow-[var(--shadow-pop)]">
             {text}
           </div>
         </div>
