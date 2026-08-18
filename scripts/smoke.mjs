@@ -30,7 +30,7 @@ await p.waitForTimeout(700);
 
 check((await p.textContent('body')).includes('Спросите что угодно'), 'экран чата открылся');
 check(await p.getByPlaceholder('Спросите что угодно…').isVisible(), 'поле ввода на месте');
-check((await p.textContent('body')).includes('демо'), 'демо-провайдер активен по умолчанию');
+check((await p.textContent('body')).includes('Демо'), 'демо-провайдер активен по умолчанию');
 
 // Сквозной сценарий: вопрос → ответ заглушки → метрики
 await p.getByPlaceholder('Спросите что угодно…').fill('Привет, проверка');

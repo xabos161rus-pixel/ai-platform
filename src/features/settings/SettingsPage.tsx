@@ -528,12 +528,8 @@ export function SettingsPage() {
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section>
-      {/* Заголовок — тихими капсами, как маркировка, а не крик: у настроек
-          иерархию несёт воздух между секциями, не вес заголовков. */}
-      <h2 className="mb-2 text-[length:var(--cc-text-caption)] font-medium tracking-[0.06em] text-muted uppercase">
-        {title}
-      </h2>
-      {hint && <p className="-mt-1 mb-2.5 text-[length:var(--cc-text-meta)] leading-relaxed text-muted">{hint}</p>}
+      <h2 className="mb-1 text-sm font-semibold">{title}</h2>
+      {hint && <p className="mb-2.5 text-[length:var(--cc-text-meta)] leading-relaxed text-muted">{hint}</p>}
       {children}
     </section>
   );

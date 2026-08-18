@@ -47,7 +47,9 @@ export function ModelPicker({ providers, providerId, model, onChange }: Props) {
         className="flex max-w-[60vw] items-center gap-1 rounded-[var(--cc-radius-sm)] px-1.5 py-0.5 font-mono text-[length:var(--cc-text-caption)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text"
       >
         <span className="truncate">
-          {current?.isDemo ? t('modelpicker.demo') : (current?.name ?? t('modelpicker.noProvider'))} · {modelLabel(model)}
+          {/* У демо лейбл модели уже говорит «Демо …» — префикс провайдера
+              давал кашу «демо · без ключа · Демо · подробный» в шапке. */}
+          {current?.isDemo ? modelLabel(model) : `${current?.name ?? t('modelpicker.noProvider')} · ${modelLabel(model)}`}
         </span>
         <ChevronDown size={12} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -56,7 +58,7 @@ export function ModelPicker({ providers, providerId, model, onChange }: Props) {
         <div className="animate-fade-in absolute top-full left-0 z-40 mt-1 max-h-80 w-72 overflow-y-auto rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--shadow-pop)]">
           {providers.map((p) => (
             <div key={p.id}>
-              <p className="px-2 pt-2 pb-1 text-[length:var(--cc-text-caption)] font-medium tracking-[0.06em] text-muted uppercase">
+              <p className="px-2 pt-2 pb-1 text-[length:var(--cc-text-caption)] font-medium text-muted">
                 {p.name}
               </p>
               {modelIds(p.models).map((m) => {
