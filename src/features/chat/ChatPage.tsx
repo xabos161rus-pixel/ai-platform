@@ -614,6 +614,7 @@ export function ChatPage() {
           </div>
           <button
             aria-label={t('chat.systemPromptAria')}
+            title={t('chat.systemPromptAria')}
             onClick={() => setPromptOpen(true)}
             disabled={!chat}
             className={`grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors active:opacity-60 ${
@@ -626,6 +627,7 @@ export function ChatPage() {
           </button>
           <button
             aria-label={t('chat.exportAria')}
+            title={t('chat.exportAria')}
             onClick={handleExport}
             disabled={!messages.length}
             className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
@@ -790,7 +792,7 @@ function Welcome({ demo, onPick }: { demo: boolean; onPick: (text: string) => vo
   const t = useT();
   const chips = [t('welcome.chip1'), t('welcome.chip2'), t('welcome.chip3'), t('welcome.chip4')];
   return (
-    <div className="flex flex-col items-center gap-3 py-24 text-center">
+    <div className="flex flex-col items-center gap-3 py-10 text-center sm:py-16">
       <div className="grid size-14 place-items-center rounded-[var(--cc-radius)] bg-surface-2 text-accent">
         <Sparkles size={26} />
       </div>
@@ -1029,7 +1031,7 @@ const AssistantBlock = memo(function AssistantBlock({
             <Markdown text={message.content} />
           </>
         )}
-        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
+        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-lg:opacity-100">
           {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
             /* Один тихий ряд через точки, без скобок: мысли — подмножество
                out (куда ушёл счёт думающей модели), кеш — вход из кеша. */

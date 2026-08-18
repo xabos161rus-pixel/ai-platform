@@ -233,7 +233,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
 
   return (
     <div ref={wrapperRef} className="shrink-0 bg-bg">
-      {barSlot && <div className="mx-auto w-full max-w-3xl px-4 pt-2">{barSlot}</div>}
+      {barSlot && <div className="mx-auto w-full max-w-3xl px-4 pt-1.5">{barSlot}</div>}
       {(images.length > 0 || files.length > 0) && (
         <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-4 pt-2">
           {images.map((src, i) => (
@@ -398,7 +398,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             <button
               aria-label={t('chat.send')}
               disabled={!draft.trim() && !images.length && !files.length}
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:opacity-25"
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:bg-transparent disabled:text-muted/40"
               onClick={() => void handleSend()}
             >
               <ArrowUp size={17} />
