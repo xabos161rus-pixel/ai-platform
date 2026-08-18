@@ -56,7 +56,7 @@ export function ModelPicker({ providers, providerId, model, onChange }: Props) {
         <div className="animate-fade-in absolute top-full left-0 z-40 mt-1 max-h-80 w-72 overflow-y-auto rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--shadow-pop)]">
           {providers.map((p) => (
             <div key={p.id}>
-              <p className="px-2 pt-2 pb-1 font-mono text-[length:var(--cc-text-caption)] tracking-wide text-muted uppercase">
+              <p className="px-2 pt-2 pb-1 text-[length:var(--cc-text-caption)] font-medium tracking-[0.06em] text-muted uppercase">
                 {p.name}
               </p>
               {modelIds(p.models).map((m) => {

@@ -530,7 +530,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
     <section>
       {/* Заголовок — тихими капсами, как маркировка, а не крик: у настроек
           иерархию несёт воздух между секциями, не вес заголовков. */}
-      <h2 className="mb-2 font-mono text-[length:var(--cc-text-caption)] font-medium tracking-[0.08em] text-muted uppercase">
+      <h2 className="mb-2 text-[length:var(--cc-text-caption)] font-medium tracking-[0.06em] text-muted uppercase">
         {title}
       </h2>
       {hint && <p className="-mt-1 mb-2.5 text-[length:var(--cc-text-meta)] leading-relaxed text-muted">{hint}</p>}

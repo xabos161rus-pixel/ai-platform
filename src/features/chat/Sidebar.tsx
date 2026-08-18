@@ -260,7 +260,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
               return (
                 <div key={`label:${g.label || 'flat'}`} className="mb-1">
                   {g.label && (
-                    <p className="px-2 pt-3 pb-1 font-mono text-[length:var(--cc-text-caption)] tracking-wide text-muted uppercase">
+                    <p className="px-2 pt-3 pb-1 text-[length:var(--cc-text-caption)] font-medium tracking-[0.06em] text-muted uppercase">
                       {g.label}
                     </p>
                   )}

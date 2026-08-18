@@ -115,6 +115,18 @@ body {
   stroke-width: 1.75;
 }
 
+/* Фокус: акцентное кольцо ТОЛЬКО с клавиатуры. Синий UA-outline браузера
+   в тёплой палитре выглядел инородным телом (ловилось на карточке
+   провайдера); мышиный клик кольца не оставляет. */
+:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+  border-radius: var(--cc-radius-sm);
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 button,
 input,
 textarea,

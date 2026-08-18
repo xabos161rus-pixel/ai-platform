@@ -65,7 +65,7 @@ export function RegenerateMenu({ rect, providers, currentProviderId, currentMode
         <div className="my-1 border-t border-hairline" />
         {providers.map((p) => (
           <div key={p.id}>
-            <p className="px-2 pt-2 pb-1 font-mono text-[length:var(--cc-text-caption)] tracking-wide text-muted uppercase">
+            <p className="px-2 pt-2 pb-1 text-[length:var(--cc-text-caption)] font-medium tracking-[0.06em] text-muted uppercase">
               {p.name}
             </p>
             {modelEntries(p.models).map((m) => {
