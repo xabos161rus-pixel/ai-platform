@@ -1,4 +1,4 @@
-import { Columns2, X } from '../../components/ui/glyphs';
+import { X } from '../../components/ui/glyphs';
 import type { Provider } from '../../db/types';
 import { modelIds, modelLabel } from '../../lib/ai/models';
 import { useT } from '../../lib/i18n';
@@ -7,37 +7,26 @@ interface Props {
   providers: Provider[];
   /** Выбранные модели в виде `providerId:model`. */
   picks: string[];
-  /** Что делать с выбранными: колонки бок о бок или консилиум. */
+  /** Какой режим обслуживают чипы — только подпись панели. */
   mode: 'columns' | 'council';
   onChange: (picks: string[]) => void;
-  onMode: (mode: 'columns' | 'council') => void;
 }
 
 /**
- * Панель режима сравнения над полем ввода. Ровно одна кнопка в свёрнутом
- * состоянии — режим редкий, и постоянно занимать им место в композере нельзя.
+ * Панель выбора моделей активного режима (сравнение или консилиум). Появляется
+ * над капсулой, только когда режим включён иконкой в композере; сама панель
+ * режим не переключает — она про состав участников.
  */
-export function CompareBar({ providers, picks, mode, onChange, onMode }: Props) {
+export function CompareBar({ providers, picks, mode, onChange }: Props) {
   const t = useT();
   const all = providers.flatMap((p) => modelIds(p.models).map((m) => ({ key: `${p.id}:${m}`, provider: p, model: m })));
-  const active = picks.length > 0;
-
-  if (!active) {
-    return (
-      <button
-        onClick={() => onChange(all.slice(0, Math.min(2, all.length)).map((x) => x.key))}
-        title={t('compare.tooltip')}
-        className="flex items-center gap-1.5 rounded-[var(--cc-radius-sm)] px-2 py-1 font-mono text-[length:var(--cc-text-caption)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text"
-      >
-        <Columns2 size={13} />
-        {t('compare.button')}
-      </button>
-    );
-  }
+  if (!picks.length) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="font-mono text-[length:var(--cc-text-caption)] text-muted">{t('compare.prefix')}</span>
+      <span className="text-[length:var(--cc-text-caption)] font-medium text-muted">
+        {mode === 'council' ? t('council.barPrefix') : t('compare.prefix')}
+      </span>
       {all.map((x) => {
         const on = picks.includes(x.key);
         return (
@@ -53,23 +42,6 @@ export function CompareBar({ providers, picks, mode, onChange, onMode }: Props) 
           </button>
         );
       })}
-      {/* Два взгляда на выбранные модели: колонки (кто что ответил) или
-          консилиум (обсуждают и сводят один ответ). Переключатель живёт
-          рядом с чипами — это свойство именно этого набора моделей. */}
-      <span className="inline-flex rounded-full bg-surface-2 p-0.5">
-        {(['columns', 'council'] as const).map((m) => (
-          <button
-            key={m}
-            aria-pressed={mode === m}
-            onClick={() => onMode(m)}
-            className={`rounded-full px-2 py-0.5 text-[length:var(--cc-text-caption)] font-medium transition-colors ${
-              mode === m ? 'bg-accent text-white' : 'text-muted hover:text-text'
-            }`}
-          >
-            {m === 'columns' ? t('council.modeColumns') : t('council.mode')}
-          </button>
-        ))}
-      </span>
       <button
         aria-label={t('compare.offAria')}
         onClick={() => onChange([])}

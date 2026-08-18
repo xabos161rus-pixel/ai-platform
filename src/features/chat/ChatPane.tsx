@@ -21,7 +21,7 @@ import { streamChat, errorText, type Reply } from '../../lib/ai/client';
 import { runAgent, RESEARCH_SYSTEM } from '../../lib/ai/agentLoop';
 import { buildTools } from '../../lib/ai/tools';
 import { runCouncil, type CouncilStage } from '../../lib/ai/council';
-import { estimateTokens, formatCost, formatTokens, modelLabel, priceInFor } from '../../lib/ai/models';
+import { estimateTokens, formatCost, formatTokens, modelIds, modelLabel, priceInFor } from '../../lib/ai/models';
 import {
   addAssistantMessage,
   addErrorMessage,
@@ -606,6 +606,8 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
   });
 
   const compareMode = settings?.compareMode ?? 'columns';
+  // Режим отправки для иконок капсулы: off = обычный вопрос одной модели.
+  const sendMode: 'off' | 'columns' | 'council' = (settings?.compareModels?.length ?? 0) > 0 ? compareMode : 'off';
   const comparePicks = (settings?.compareModels ?? [])
     .map((k) => {
       const [providerId, ...rest] = k.split(':');
@@ -615,6 +617,19 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
 
   async function setComparePicks(keys: string[]) {
     await db.settings.update('app', { compareModels: keys, updatedAt: new Date().toISOString() });
+  }
+
+  /** Иконки режимов в капсуле: включение подбирает первые две модели, если
+   *  состав пуст; повторный тап по активной — выключает режим целиком. */
+  async function handleSendMode(m: 'off' | 'columns' | 'council') {
+    if (m === 'off') {
+      await setComparePicks([]);
+      return;
+    }
+    const keys = settings?.compareModels?.length
+      ? settings.compareModels
+      : providers.flatMap((p) => modelIds(p.models).map((x) => `${p.id}:${x}`)).slice(0, 2);
+    await db.settings.update('app', { compareMode: m, compareModels: keys, updatedAt: new Date().toISOString() });
   }
 
   return (
@@ -806,14 +821,17 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
           onToolMode={(m) => chat && void patchChat(chat.id, { toolMode: m })}
           baseTokens={baseTokens}
           priceIn={activePriceIn}
+          sendMode={sendMode}
+          onSendMode={(m) => void handleSendMode(m)}
           barSlot={
-            <CompareBar
-              providers={providers}
-              picks={settings?.compareModels ?? []}
-              mode={compareMode}
-              onChange={(keys) => void setComparePicks(keys)}
-              onMode={(m) => void db.settings.update('app', { compareMode: m, updatedAt: new Date().toISOString() })}
-            />
+            sendMode !== 'off' ? (
+              <CompareBar
+                providers={providers}
+                picks={settings?.compareModels ?? []}
+                mode={compareMode}
+                onChange={(keys) => void setComparePicks(keys)}
+              />
+            ) : null
           }
         />
       </div>

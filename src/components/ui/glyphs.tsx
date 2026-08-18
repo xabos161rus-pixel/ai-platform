@@ -167,6 +167,28 @@ export const Columns2 = glyph(
   </>,
 );
 
+/** Сравнение: две самостоятельные панели с зазором — не таблица с
+ *  разделителем. Читается «бок о бок» с первого взгляда. */
+export const CompareColumns = glyph(
+  'compare',
+  <>
+    <rect x="3.8" y="5" width="7.2" height="14" rx="1.8" />
+    <rect x="13" y="5" width="7.2" height="14" rx="1.8" />
+  </>,
+);
+
+/** Консилиум: три участника вокруг стола. Породы деталей не выживают на
+ *  16px — три головы-точки и дуга стола, ничего лишнего. */
+export const Council = glyph(
+  'council',
+  <>
+    <circle cx="12" cy="5.4" r="1.7" fill="currentColor" stroke="none" />
+    <circle cx="5.2" cy="16.4" r="1.7" fill="currentColor" stroke="none" />
+    <circle cx="18.8" cy="16.4" r="1.7" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="13.2" r="4.1" />
+  </>,
+);
+
 // === Чат и содержимое ===
 
 export const MessageSquare = glyph(

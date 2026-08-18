@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { ArrowUp, FileText, Globe, Paperclip, Square, X } from '../../components/ui/glyphs';
+import { ArrowUp, CompareColumns, Council, FileText, Globe, Paperclip, Square, X } from '../../components/ui/glyphs';
 import { useToast } from '../../components/ui/toastContext';
 import { compressImage, MAX_IMAGES } from '../../lib/images';
 import {
@@ -35,6 +35,9 @@ interface Props {
   /** Режим агентских инструментов текущего чата — переключается кнопкой-глобусом. */
   toolMode: 'off' | 'tools' | 'research';
   onToolMode: (m: 'off' | 'tools' | 'research') => void;
+  /** Режим отправки: обычный, сравнение колонками или консилиум. */
+  sendMode: 'off' | 'columns' | 'council';
+  onSendMode: (m: 'off' | 'columns' | 'council') => void;
   /** ≈токенов уже в контексте (история по лимиту + системный промпт) — из ChatPage. */
   baseTokens?: number;
   /** ₽ за 1M входных токенов активной модели; null — цена неизвестна. */
@@ -60,7 +63,7 @@ function autosize(el: HTMLTextAreaElement) {
  * чипов и правки по стрелке вверх.
  */
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
-  { busy, canSend, onSend, onStop, onEditLast, toolMode, onToolMode, baseTokens = 0, priceIn = null, barSlot },
+  { busy, canSend, onSend, onStop, onEditLast, toolMode, onToolMode, sendMode, onSendMode, baseTokens = 0, priceIn = null, barSlot },
   ref,
 ) {
   const toast = useToast();
@@ -375,6 +378,35 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             }
           >
             <Globe size={18} />
+          </button>
+          {/* Режимы отправки — самостоятельные входы, а не варианты одной
+              кнопки: сравнение и консилиум — разные инструменты. Актив —
+              клай, как у режимов глобуса. */}
+          <button
+            aria-label={t('compare.modeAria')}
+            title={t('compare.modeAria')}
+            aria-pressed={sendMode === 'columns'}
+            disabled={busy}
+            onClick={() => onSendMode(sendMode === 'columns' ? 'off' : 'columns')}
+            className={
+              'grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
+              (sendMode === 'columns' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')
+            }
+          >
+            <CompareColumns size={18} />
+          </button>
+          <button
+            aria-label={t('council.modeAria')}
+            title={t('council.modeAria')}
+            aria-pressed={sendMode === 'council'}
+            disabled={busy}
+            onClick={() => onSendMode(sendMode === 'council' ? 'off' : 'council')}
+            className={
+              'grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
+              (sendMode === 'council' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')
+            }
+          >
+            <Council size={18} />
           </button>
           <span className="flex-1" />
           {estIn > 0 && (

@@ -141,8 +141,8 @@ await p.keyboard.press('Escape');
 await p.waitForTimeout(300);
 await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
 await p.waitForTimeout(600);
-check(await p.getByRole('button', { name: 'сравнить' }).isVisible(), 'кнопка сравнения в композере');
-await p.getByRole('button', { name: 'сравнить' }).click();
+check(await p.getByRole('button', { name: 'Сравнение моделей' }).isVisible(), 'иконка режима сравнения в капсуле');
+await p.getByRole('button', { name: 'Сравнение моделей' }).click();
 await p.waitForTimeout(500);
 check((await p.textContent('body')).includes('сравнить:'), 'панель выбора моделей раскрылась');
 
@@ -797,9 +797,9 @@ await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
 await p.waitForTimeout(500);
 await p.getByRole('button', { name: 'Новый чат' }).first().click();
 await p.waitForTimeout(400);
-await p.getByRole('button', { name: 'сравнить' }).click();
+await p.getByRole('button', { name: 'Консилиум моделей' }).click();
 await p.waitForTimeout(300);
-// «сравнить» авто-выбирает первые две модели из ВСЕХ провайдеров — в смоуке
+// Режим авто-выбирает первые две модели из ВСЕХ провайдеров — в смоуке
 // это модели временного tmp-1 без ключа. Консилиуму нужны демо: снимаем
 // чужие чипы, включаем оба демо. Целимся по testid: имена моделей дублируются
 // с кнопкой пикера в шапке, и строковый локатор скакал между ними.
@@ -817,8 +817,6 @@ for (const key of ['demo:demo-echo', 'demo:demo-fast']) {
     await p.waitForTimeout(150);
   }
 }
-await p.waitForTimeout(200);
-await p.getByRole('button', { name: 'консилиум' }).click();
 await p.waitForTimeout(200);
 await p.getByPlaceholder('Спросите что угодно…').fill('вопрос для консилиума');
 await p.getByRole('button', { name: 'Отправить' }).click();
@@ -840,7 +838,7 @@ await p.reload({ waitUntil: 'networkidle' });
 await p.waitForTimeout(800);
 check((await p.textContent('body')).includes('Консилиум ·'), 'консилиум: оборванный прогон виден блоком после перезагрузки');
 // Чистим режим, чтобы не влиять на будущие прогоны смоука.
-await p.getByRole('button', { name: 'колонки' }).click().catch(() => {});
+await p.getByRole('button', { name: 'Консилиум моделей' }).click().catch(() => {});
 
 // СПЛИТ: второй чат рядом (десктоп): из меню строки сайдбара, полная
 // независимость панелей, закрытие крестиком.
