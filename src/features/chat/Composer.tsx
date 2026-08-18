@@ -233,22 +233,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
 
   return (
     <div ref={wrapperRef} className="shrink-0 bg-bg">
-      {/* Служебная строка композера: слева режим сравнения, справа тихая
-          метрика ≈входа. Одна строка, два конца — не две сироты друг над
-          другом. tabular-nums держит ширину цифр, чтобы текст не дрожал при
-          наборе; подробности — в title, строка не объясняет сама себя. */}
-      <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 pt-2">
-        <div className="min-w-0">{barSlot}</div>
-        {estIn > 0 && (
-          <span
-            title={t('composer.estTitle')}
-            className="shrink-0 cursor-default font-mono text-[length:var(--cc-text-caption)] text-muted/70 tabular-nums transition-opacity"
-          >
-            {t('composer.estIn', { n: formatTokens(estIn) })}
-            {estRub != null && estRub >= 0.01 ? ` · ${estRub.toFixed(2).replace('.', ',')} ₽` : ''}
-          </span>
-        )}
-      </div>
+      {barSlot && <div className="mx-auto w-full max-w-3xl px-4 pt-2">{barSlot}</div>}
       {(images.length > 0 || files.length > 0) && (
         <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-4 pt-2">
           {images.map((src, i) => (
@@ -282,7 +267,11 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           ))}
         </div>
       )}
-      <div className="relative mx-auto flex w-full max-w-3xl items-end gap-2 px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+10px)]">
+      {/* Капсула ввода — одна поверхность: текст сверху, контролы нижним
+          рядом ВНУТРИ (как у лучших чат-интерфейсов). Метрика ≈входа живёт
+          в этом же ряду перед кнопкой отправки — у неё нет отдельного этажа,
+          и на телефоне она больше не болтается в пустоте. */}
+      <div className="relative mx-auto w-full max-w-3xl px-4 pt-2 pb-[calc(env(safe-area-inset-bottom)+10px)]">
         {menuOpen && (
           <SnippetMenu
             ref={menuRef}
@@ -293,29 +282,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             }}
           />
         )}
-        <button
-          aria-label={t('chat.attachFile')}
-          disabled={busy}
-          onClick={() => fileRef.current?.click()}
-          className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
-        >
-          <Paperclip size={19} />
-        </button>
-        <button
-          aria-label={t(`agent.mode.${toolMode}`)}
-          title={t(`agent.mode.${toolMode}`)}
-          onClick={() => onToolMode(NEXT_TOOL_MODE[toolMode])}
-          className={
-            'grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors active:opacity-60 ' +
-            (toolMode === 'research'
-              ? 'bg-accent/15 text-accent'
-              : toolMode === 'tools'
-                ? 'text-accent'
-                : 'text-muted hover:text-text')
-          }
-        >
-          <Globe size={19} />
-        </button>
+        <div className="flex flex-col rounded-[calc(var(--cc-radius)*1.6)] bg-surface-2 transition-shadow focus-within:shadow-[0_0_0_1px_var(--app-accent)]">
         <input
           ref={fileRef}
           type="file"
@@ -333,7 +300,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           value={draft}
           rows={1}
           placeholder={t('chat.placeholder')}
-          className="max-h-44 min-h-[var(--cc-touch)] flex-1 resize-none rounded-[var(--cc-radius)] bg-surface-2 px-3.5 py-2.5 outline-none transition-shadow placeholder:text-muted focus:shadow-[0_0_0_1px_var(--app-accent)]"
+          className="max-h-44 min-h-[var(--cc-touch)] w-full resize-none bg-transparent px-4 pt-3 pb-1 outline-none placeholder:text-muted"
           onChange={(e) => {
             handleChange(e.target.value);
             autosize(e.target);
@@ -385,24 +352,60 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             }
           }}
         />
-        {busy ? (
+        <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
           <button
-            aria-label={t('chat.stop')}
-            className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-surface-2 transition-opacity active:opacity-70"
-            onClick={onStop}
+            aria-label={t('chat.attachFile')}
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+            className="grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
           >
-            <Square size={15} />
+            <Paperclip size={18} />
           </button>
-        ) : (
           <button
-            aria-label={t('chat.send')}
-            disabled={!draft.trim() && !images.length && !files.length}
-            className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:opacity-25"
-            onClick={() => void handleSend()}
+            aria-label={t(`agent.mode.${toolMode}`)}
+            title={t(`agent.mode.${toolMode}`)}
+            onClick={() => onToolMode(NEXT_TOOL_MODE[toolMode])}
+            className={
+              'grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 ' +
+              (toolMode === 'research'
+                ? 'bg-accent/15 text-accent'
+                : toolMode === 'tools'
+                  ? 'text-accent'
+                  : 'text-muted hover:text-text')
+            }
           >
-            <ArrowUp size={19} />
+            <Globe size={18} />
           </button>
-        )}
+          <span className="flex-1" />
+          {estIn > 0 && (
+            <span
+              title={t('composer.estTitle')}
+              className="mr-2 shrink-0 cursor-default font-mono text-[length:var(--cc-text-caption)] text-muted/60 tabular-nums select-none"
+            >
+              {t('composer.estIn', { n: formatTokens(estIn) })}
+              {estRub != null && estRub >= 0.01 ? ` · ${estRub.toFixed(2).replace('.', ',')} ₽` : ''}
+            </span>
+          )}
+          {busy ? (
+            <button
+              aria-label={t('chat.stop')}
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-bg transition-opacity active:opacity-70"
+              onClick={onStop}
+            >
+              <Square size={14} />
+            </button>
+          ) : (
+            <button
+              aria-label={t('chat.send')}
+              disabled={!draft.trim() && !images.length && !files.length}
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:opacity-25"
+              onClick={() => void handleSend()}
+            >
+              <ArrowUp size={17} />
+            </button>
+          )}
+        </div>
+        </div>
       </div>
     </div>
   );
