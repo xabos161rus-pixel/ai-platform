@@ -285,7 +285,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             }}
           />
         )}
-        <div className="flex flex-col rounded-[calc(var(--cc-radius)*1.6)] bg-surface-2 transition-shadow focus-within:shadow-[0_0_0_1px_var(--app-accent)]">
+        <div className="cc-capsule flex flex-col rounded-[calc(var(--cc-radius)*1.6)] bg-surface-2 transition-shadow focus-within:shadow-[0_0_0_1px_var(--app-accent)]">
         <input
           ref={fileRef}
           type="file"

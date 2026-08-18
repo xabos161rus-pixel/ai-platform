@@ -132,6 +132,11 @@ body {
 :focus:not(:focus-visible) {
   outline: none;
 }
+/* Внутри капсулы фокус показывает САМА капсула (focus-within-кольцо):
+   собственный outline textarea давал вторую рамку в рамке. */
+.cc-capsule :focus-visible {
+  outline: none;
+}
 
 button,
 input,
