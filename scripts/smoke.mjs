@@ -920,6 +920,51 @@ await p.getByLabel('Удалить пустую папку «Тестпапка�
 await p.waitForTimeout(400);
 check(!(await p.textContent('aside')).includes('Тестпапка'), 'пустая папка удалена корзинкой');
 
+// ЦИТАТЫ ИСТОЧНИКОВ: сообщение с sources и сноской [1] в тексте — сноска
+// становится кликабельной ссылкой, под ответом блок «Источники».
+await p.evaluate(async () => {
+  const idb = await new Promise((resolve, reject) => {
+    const req = indexedDB.open('ai-platform');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  const tx = idb.transaction(['chats', 'messages'], 'readwrite');
+  const now = new Date().toISOString();
+  const chatId = 'smoke-cite-chat';
+  tx.objectStore('chats').put({
+    id: chatId, createdAt: now, updatedAt: now, deletedAt: null,
+    title: 'Цитаты-проверка', providerId: 'demo', model: 'demo-echo',
+    systemPrompt: '', lastMessageAt: now, pinned: false,
+  });
+  tx.objectStore('messages').put({
+    id: 'smoke-cite-q', chatId, createdAt: now, updatedAt: now, deletedAt: null,
+    role: 'user', content: 'вопрос про источники', model: null,
+    tokensIn: null, tokensOut: null, costRub: null, status: 'done', error: null,
+  });
+  tx.objectStore('messages').put({
+    id: 'smoke-cite-a', chatId, createdAt: new Date(Date.now() + 1000).toISOString(), updatedAt: now, deletedAt: null,
+    role: 'assistant', content: 'Проверенный факт [1] и ещё один [2].', model: 'demo-echo',
+    tokensIn: 10, tokensOut: 12, costRub: 0, status: 'done', error: null,
+    parentId: 'smoke-cite-q',
+    sources: [
+      { n: 1, title: 'Первый источник', url: 'https://example.com/one' },
+      { n: 2, title: 'Второй источник', url: 'https://example.org/two' },
+    ],
+  });
+  await new Promise((resolve, reject) => {
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  idb.close();
+});
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(700);
+await p.getByText('Цитаты-проверка', { exact: false }).first().click();
+await p.waitForTimeout(600);
+check((await p.locator('sup.cc-cite a[href="https://example.com/one"]').count()) === 1, 'цитата [1] стала кликабельной сноской');
+check((await p.textContent('body')).includes('Первый источник'), 'блок «Источники» показывает заголовок');
+check((await p.textContent('body')).includes('example.org'), 'домен источника виден рядом с заголовком');
+
 // СПЛИТ: второй чат рядом (десктоп): из меню строки сайдбара, полная
 // независимость панелей, закрытие крестиком.
 await p.setViewportSize({ width: 1400, height: 800 });

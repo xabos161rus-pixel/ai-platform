@@ -177,6 +177,8 @@ export async function addAssistantMessage(
     provider?: Provider | null;
     /** Трейс агентского цикла (шаги инструментов) — только для отображения, в wire не уходит. */
     toolTrace?: ToolStep[];
+    /** Источники веб-поиска прогона — сноски [n] в ответе. */
+    sources?: { n: number; title: string; url: string }[];
   },
 ): Promise<Message> {
   // Лист сдвигаем только для представителя прогона (runIndex 0) либо для
@@ -201,6 +203,7 @@ export async function addAssistantMessage(
       reasoning: reply.reasoning || undefined,
       parentId: opts?.parentId,
       toolTrace: opts?.toolTrace?.length ? opts.toolTrace : undefined,
+      sources: opts?.sources?.length ? opts.sources : undefined,
       councilStage: opts?.councilStage,
     },
     // Лист двигают обычный ответ, первая колонка сравнения и ФИНАЛ консилиума;

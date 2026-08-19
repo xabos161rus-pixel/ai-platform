@@ -264,6 +264,8 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
       let partial = '';
       let think = '';
       let stepsAcc: ToolStep[] = [];
+      // Источники веб-поиска этого прогона — наполняет web_search (buildTools).
+      let runSources: { n: number; title: string; url: string }[] = [];
       // Свежий чат из БД: activeLeafId мог только что смениться (правка,
       // переключение версии) прямо перед вызовом — chat из useLiveQuery мог
       // ещё не перечитаться.
@@ -301,10 +303,11 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
           // Синк включён и адрес сервера задан → web_search ходит через свой
           // воркер (Serper), с молчаливым фолбэком на Jina внутри самого
           // инструмента; иначе — undefined, и поведение ровно прежнее.
-          const tools = buildTools({
+          const { tools, sources } = buildTools({
             jinaKey,
             sync: syncSearchOn ? { serverUrl: syncServerUrl, spaceId: syncSpaceId, authToken: syncAuthToken } : undefined,
           });
+          runSources = sources;
           reply = await runAgent({
             provider: useProvider,
             messages: history,
@@ -327,7 +330,12 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             onToolsUnsupported: () => toast(t('agent.toolsUnsupported')),
           });
         }
-        await addAssistantMessage(chat.id, reply, { parentId: leafId ?? null, provider: useProvider, toolTrace: reply.toolTrace });
+        await addAssistantMessage(chat.id, reply, {
+          parentId: leafId ?? null,
+          provider: useProvider,
+          toolTrace: reply.toolTrace,
+          sources: runSources.length ? runSources : undefined,
+        });
       } catch (e) {
         // Прерванный ответ не выбрасываем: сохраняем то, что успело прийти —
         // иначе человек теряет полезный текст из-за случайного «стоп».
@@ -1113,7 +1121,36 @@ const AssistantBlock = memo(function AssistantBlock({
           <>
             {message.toolTrace?.length ? <ToolTrace steps={message.toolTrace} /> : null}
             {message.reasoning && <ReasoningBlock text={message.reasoning} />}
-            <Markdown text={message.content} />
+            <Markdown text={message.content} sources={message.sources} />
+            {!!message.sources?.length && (
+              <div className="mt-2.5 border-t border-hairline pt-2">
+                <p className="mb-1 text-[length:var(--cc-text-caption)] font-medium text-muted">{t('chat.sources')}</p>
+                <div className="space-y-0.5">
+                  {message.sources.map((src) => (
+                    <p key={src.n} className="flex items-baseline gap-2 text-[length:var(--cc-text-meta)]">
+                      <span className="shrink-0 font-mono text-muted tabular-nums">[{src.n}]</span>
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 truncate text-text hover:text-accent"
+                      >
+                        {src.title}
+                      </a>
+                      <span className="shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">
+                        {(() => {
+                          try {
+                            return new URL(src.url).hostname.replace(/^www\./, '');
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                      </span>
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-lg:opacity-100">

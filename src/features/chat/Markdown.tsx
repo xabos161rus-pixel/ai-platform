@@ -21,6 +21,34 @@ function render(text: string): string {
   });
 }
 
+export interface SourceRef {
+  n: number;
+  title: string;
+  url: string;
+}
+
+/**
+ * Сноски [n] → кликабельные надстрочные ссылки на источники прогона.
+ * Применяется только к html-сегментам (блоки кода — отдельная React-ветка
+ * CodeBlock и сюда не попадают), но инлайн-<code> внутри html есть — его
+ * пропускаем: «[1]» в коде — легитимный синтаксис.
+ */
+function linkCitations(html: string, sources: SourceRef[]): string {
+  if (!sources.length) return html;
+  const byN = new Map(sources.map((s) => [s.n, s]));
+  return html
+    .split(/(<code[\s\S]*?<\/code>)/g)
+    .map((part, i) => {
+      if (i % 2 === 1) return part;
+      return part.replace(/\[(\d{1,2})\]/g, (m, num: string) => {
+        const src = byN.get(Number(num));
+        if (!src) return m;
+        return `<sup class="cc-cite"><a href="${src.url}" target="_blank" rel="noopener noreferrer" title="${src.title.replace(/"/g, '&quot;')}">${num}</a></sup>`;
+      });
+    })
+    .join('');
+}
+
 type Seg = { type: 'html'; html: string } | { type: 'code'; lang: string; code: string };
 
 /**
@@ -67,8 +95,13 @@ function HtmlSegment({ html }: { html: string }) {
 }
 
 /** memo по стабильному text: во время стрима меняется только последний сегмент. */
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
-  const segs = useMemo(() => toSegments(text), [text]);
+export const Markdown = memo(function Markdown({ text, sources }: { text: string; sources?: SourceRef[] }) {
+  const segs = useMemo(() => {
+    const raw = toSegments(text);
+    // Сноски вставляются после санитайзера (render внутри toSegments): их
+    // разметка своя и безопасная — url из результатов поиска, кавычки экранированы.
+    return sources?.length ? raw.map((s) => (s.type === 'html' ? { ...s, html: linkCitations(s.html, sources) } : s)) : raw;
+  }, [text, sources]);
   return (
     <>
       {segs.map((s, i) =>

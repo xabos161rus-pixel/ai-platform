@@ -269,6 +269,10 @@ select {
 .cc-md li { margin: 0.2em 0; }
 .cc-md li::marker { color: var(--app-muted); }
 .cc-md a { color: var(--app-accent); text-decoration: underline; text-underline-offset: 2px; }
+/* Сноска-цитата [n]: тихий моно-чип, ссылка без подчёркивания. */
+.cc-md sup.cc-cite { margin-inline: 1px; font-family: var(--font-mono, ui-monospace), monospace; font-size: 0.72em; }
+.cc-md sup.cc-cite a { text-decoration: none; padding: 0 2px; border-radius: 4px; background: var(--cc-fill-control); }
+.cc-md sup.cc-cite a:hover { background: var(--app-accent); color: white; }
 .cc-md strong { font-weight: 650; }
 .cc-md hr { border: 0; border-top: 1px solid var(--app-hairline); margin: 1.2em 0; }
 .cc-md blockquote {

@@ -67,7 +67,37 @@ interface JinaSearchResponse {
  * путь при выключенном синке, и как молчаливый фолбэк, когда серверный поиск
  * недоступен/выключен (см. makeWebSearchTool ниже).
  */
-async function jinaSearch(query: string, ctx: ToolCtx): Promise<string> {
+export interface SourceRef {
+  n: number;
+  title: string;
+  url: string;
+}
+
+/** Сквозная нумерация результатов и сбор источников прогона: buildTools
+ *  создаётся на каждый прогон, счётчик и реестр живут в его замыкании. */
+interface SourceBook {
+  next: number;
+  refs: SourceRef[];
+  add(title: string, url: string): number;
+}
+
+function newSourceBook(): SourceBook {
+  const book: SourceBook = {
+    next: 1,
+    refs: [],
+    add(title, url) {
+      // Один URL — один номер: повторный поиск не плодит дубли источников.
+      const seen = book.refs.find((r) => r.url === url);
+      if (seen) return seen.n;
+      const ref = { n: book.next++, title: title || url, url };
+      book.refs.push(ref);
+      return ref.n;
+    },
+  };
+  return book;
+}
+
+async function jinaSearch(query: string, ctx: ToolCtx, book: SourceBook): Promise<string> {
   const res = await fetch(`https://s.jina.ai/?q=${encodeURIComponent(query)}`, {
     headers: {
       Accept: 'application/json',
@@ -85,9 +115,10 @@ async function jinaSearch(query: string, ctx: ToolCtx): Promise<string> {
   // Wire-контент для модели (как и остальные строки результата инструмента) — по-английски, не через i18n.
   if (!hits.length) return 'No results found';
   return hits
-    .map((h, i) => {
-      const snippet = (h.description ?? h.content ?? '').slice(0, 300);
-      return `${i + 1}. ${h.title ?? ''}\n${h.url ?? ''}\n${snippet}`;
+    .map((h) => {
+      const n = book.add(h.title ?? '', h.url ?? '');
+      const snippet = (h.description ?? h.content ?? '').slice(0, 400);
+      return `[${n}] ${h.title ?? ''}\n${h.url ?? ''}\n${snippet}`;
     })
     .join('\n\n');
 }
@@ -107,10 +138,11 @@ export interface SyncSearchCtx {
  * agentLoop остаётся нетронутым, а web_search просто получает готовый
  * sync-конфиг из замыкания либо undefined.
  */
-function makeWebSearchTool(sync?: SyncSearchCtx): ToolDef {
+function makeWebSearchTool(book: SourceBook, sync?: SyncSearchCtx): ToolDef {
   return {
     name: 'web_search',
-    description: 'Search the web and return top results with title, url and a short snippet.',
+    description:
+      'Search the web and return numbered results [n] with title, url and a short snippet. Cite facts in your answer with the matching [n] markers.',
     parameters: {
       type: 'object',
       properties: {
@@ -133,7 +165,15 @@ function makeWebSearchTool(sync?: SyncSearchCtx): ToolDef {
           const hits = (data.results ?? []).slice(0, SEARCH_TOP);
           if (hits.length || data.answer) {
             const head = data.answer ? `Ответ: ${data.answer}\n\n` : '';
-            return head + hits.map((h, i) => `${i + 1}. ${h.title ?? ''}\n${h.url ?? ''}\n${(h.snippet ?? '').slice(0, 300)}`).join('\n\n');
+            return (
+              head +
+              hits
+                .map((h) => {
+                  const n = book.add(h.title ?? '', h.url ?? '');
+                  return `[${n}] ${h.title ?? ''}\n${h.url ?? ''}\n${(h.snippet ?? '').slice(0, 400)}`;
+                })
+                .join('\n\n')
+            );
           }
           return 'No results found';
         } catch (e) {
@@ -142,7 +182,7 @@ function makeWebSearchTool(sync?: SyncSearchCtx): ToolDef {
           // Сервер лёг/квота/выключен поиск — молча падаем на Jina: пользователь просто получает результат.
         }
       }
-      return jinaSearch(query, ctx);
+      return jinaSearch(query, ctx, book);
     },
   };
 }
@@ -185,12 +225,15 @@ const getTimeTool: ToolDef = {
   },
 };
 
-export function buildTools(opts: { jinaKey?: string; sync?: SyncSearchCtx }): ToolDef[] {
+export function buildTools(opts: { jinaKey?: string; sync?: SyncSearchCtx }): { tools: ToolDef[]; sources: SourceRef[] } {
   // opts.jinaKey и здесь не участвует — инструменты читают его из ToolCtx на
   // каждый вызов (его собирает agentLoop.execWithTimeout). А opts.sync нужен
   // именно на этом этапе: серверный конфиг замыкается в web_search при сборке
   // списка инструментов, а не через ToolCtx (см. makeWebSearchTool выше).
-  return [makeWebSearchTool(opts.sync), readPageTool, getTimeTool];
+  // Реестр источников живёт в замыкании прогона: buildTools вызывается на
+  // каждый запрос, нумерация [n] сквозная и стабильная в его пределах.
+  const book = newSourceBook();
+  return { tools: [makeWebSearchTool(book, opts.sync), readPageTool, getTimeTool], sources: book.refs };
 }
 
 export function toWireTools(tools: ToolDef[]): WireTool[] {

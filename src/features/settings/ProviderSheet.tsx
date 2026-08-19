@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { X } from '../../components/ui/glyphs';
+import { Download, X } from '../../components/ui/glyphs';
 import { Sheet } from '../../components/ui/Sheet';
 import { Button } from '../../components/ui/Button';
 import type { BaseEntity, Provider } from '../../db/types';
 import { modelEntries } from '../../lib/ai/models';
 import { useT } from '../../lib/i18n';
+import { useToast } from '../../components/ui/toastContext';
 
 interface Props {
   open: boolean;
@@ -41,6 +42,8 @@ function parsePrice(raw: string): number | undefined {
  */
 export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
   const t = useT();
+  const toast = useToast();
+  const [fetching, setFetching] = useState(false);
   const [name, setName] = useState(provider?.name ?? '');
   const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? '');
   const [apiKey, setApiKey] = useState(provider?.apiKey ?? '');
@@ -61,6 +64,41 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
 
   function removeRow(i: number) {
     setRows((rs) => (rs.length > 1 ? rs.filter((_, idx) => idx !== i) : rs));
+  }
+
+  /** Подтянуть список моделей с эндпоинта провайдера (GET /models,
+   *  OpenAI-формат). Новые id добавляются строками, цены уже введённых —
+   *  не трогаются: прайс агрегаторы через API не отдают. */
+  async function handleFetchModels() {
+    const base = baseUrl.trim().replace(/\/+$/, '');
+    if (!base || fetching) return;
+    setFetching(true);
+    try {
+      const res = await fetch(`${base}/models`, {
+        headers: apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {},
+      });
+      if (!res.ok) {
+        toast(res.status === 401 || res.status === 403 ? t('provider.fetchAuthError') : t('provider.fetchError', { status: String(res.status) }));
+        return;
+      }
+      const data = (await res.json()) as { data?: { id?: string }[] };
+      const ids = (data.data ?? []).map((m) => m.id).filter((id): id is string => typeof id === 'string' && !!id.trim());
+      if (!ids.length) {
+        toast(t('provider.fetchEmpty'));
+        return;
+      }
+      setRows((rs) => {
+        const existing = new Set(rs.map((r) => r.id.trim()).filter(Boolean));
+        const fresh = ids.filter((id) => !existing.has(id)).sort((a, b) => a.localeCompare(b));
+        const kept = rs.filter((r) => r.id.trim());
+        return [...kept, ...fresh.map((id) => ({ id, priceIn: '', priceOut: '' }))];
+      });
+      toast(t('provider.fetchDone', { n: ids.length }));
+    } catch {
+      toast(t('provider.fetchNetwork'));
+    } finally {
+      setFetching(false);
+    }
   }
 
   function handleSave() {
@@ -123,7 +161,17 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
         />
 
         <div>
-          <span className="mb-1 block text-sm font-medium">{t('provider.models')}</span>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">{t('provider.models')}</span>
+            <button
+              disabled={!baseUrl.trim() || fetching}
+              onClick={() => void handleFetchModels()}
+              className="flex items-center gap-1.5 rounded-[var(--cc-radius-sm)] px-2 py-1 text-[length:var(--cc-text-meta)] font-medium text-accent transition-colors hover:bg-[var(--cc-fill-ghost-hover)] active:opacity-60 disabled:opacity-30"
+            >
+              <Download size={13} className={fetching ? 'animate-pulse' : ''} />
+              {fetching ? t('provider.fetching') : t('provider.fetchModels')}
+            </button>
+          </div>
           <p className="mb-2 text-[length:var(--cc-text-caption)] leading-relaxed text-muted">{t('provider.modelsHead')}</p>
           <div className="space-y-1.5">
             {rows.map((row, i) => (

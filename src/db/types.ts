@@ -97,6 +97,9 @@ export interface Message extends BaseEntity {
   parentId?: string | null;
   /** След агентского прогона (шаги инструментов) — только для отображения; в toContext/wire не попадает. */
   toolTrace?: ToolStep[];
+  /** Источники веб-поиска прогона: сквозные номера [n], на которые ссылается
+   *  текст ответа. Рендерятся кликабельными сносками и блоком «Источники». */
+  sources?: { n: number; title: string; url: string }[];
   /** Метаданные прикреплённых файлов (не картинок). Текст — параллельно, в fileTexts[i]. Рендерится в пузыре чипом. */
   files?: { name: string; size: number; textChars: number }[];
   /** Извлечённый текст файлов, по индексу как в files. Не рендерится — уходит в wire через toContext. */
