@@ -9,6 +9,7 @@ import {
   SquarePen,
   Columns2,
   MoreHorizontal,
+  Plus,
   Pencil,
   Pin,
   PinOff,
@@ -132,11 +133,30 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
     const pinned = chats.filter((c) => c.pinned);
     // Не-pinned дальше распределяются по папкам и датам — pin приоритетнее папки.
     const rest = chats.filter((c) => !c.pinned);
-    const out: { kind: 'label' | 'folder'; label: string; items: Chat[] }[] = [];
+    const out: { kind: 'label' | 'folder'; label: string; items: Chat[]; children?: { label: string; path: string; items: Chat[] }[] }[] = [];
     if (pinned.length) out.push({ kind: 'label', label: t('sidebar.pinned'), items: pinned });
-    for (const name of listFolders(rest)) {
-      const items = rest.filter((c) => c.folder === name);
-      if (items.length) out.push({ kind: 'folder', label: name, items });
+    // Папка — путь «Родитель/Дитя», глубина два уровня: чаты с folder
+    // 'Работа' лежат в корне папки, 'Работа/Клиенты' — в её подпапке.
+    const roots = new Map<string, { items: Chat[]; children: Map<string, Chat[]> }>();
+    for (const c of rest) {
+      if (!c.folder) continue;
+      const [root, ...tail] = c.folder.split('/');
+      const sub = tail.join('/');
+      const node = roots.get(root) ?? { items: [], children: new Map<string, Chat[]>() };
+      if (sub) node.children.set(sub, [...(node.children.get(sub) ?? []), c]);
+      else node.items.push(c);
+      roots.set(root, node);
+    }
+    for (const root of [...roots.keys()].sort((a, b) => a.localeCompare(b, 'ru'))) {
+      const node = roots.get(root)!;
+      out.push({
+        kind: 'folder',
+        label: root,
+        items: node.items,
+        children: [...node.children.keys()]
+          .sort((a, b) => a.localeCompare(b, 'ru'))
+          .map((subName) => ({ label: subName, path: `${root}/${subName}`, items: node.children.get(subName)! })),
+      });
     }
     const withoutFolder = rest.filter((c) => !c.folder);
     for (const c of withoutFolder) {
@@ -257,6 +277,41 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
                           onEndRename={() => setRenamingId(null)}
                         />
                       ))}
+                    {!isCollapsed &&
+                      (g.children ?? []).map((sub) => {
+                        const subCollapsed = collapsed.has(sub.path);
+                        return (
+                          <div key={`sub:${sub.path}`} className="pl-3">
+                            <button
+                              onClick={() => toggleFolder(sub.path)}
+                              className="flex min-h-9 w-full items-center gap-1.5 px-2 text-left"
+                            >
+                              <ChevronRight
+                                size={13}
+                                className={`shrink-0 text-muted transition-transform ${subCollapsed ? '' : 'rotate-90'}`}
+                              />
+                              <Folder size={13} className="shrink-0 text-muted" />
+                              <span className="min-w-0 flex-1 truncate text-sm">{sub.label}</span>
+                              <span className="ml-auto shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">
+                                {sub.items.length}
+                              </span>
+                            </button>
+                            {!subCollapsed &&
+                              sub.items.map((c) => (
+                                <ChatRow
+                                  key={c.id}
+                                  chat={c}
+                                  active={c.id === activeId}
+                                  renaming={renamingId === c.id}
+                                  menuOpen={menuFor?.chat.id === c.id}
+                                  onPick={() => onPick(c.id)}
+                                  onMenu={(rect) => setMenuFor({ chat: c, rect })}
+                                  onEndRename={() => setRenamingId(null)}
+                                />
+                              ))}
+                          </div>
+                        );
+                      })}
                   </div>
                 );
               }
@@ -494,27 +549,58 @@ function RowMenu({
                 {t('sidebar.noFolder')}
               </button>
             )}
-            {folderNames.map((name) => (
-              <button
-                key={name}
-                className={itemClass}
-                onClick={() => {
-                  void patchChat(chat.id, { folder: name });
-                  onClose();
-                }}
-              >
-                <Folder size={15} className="text-muted" />
-                <span className="min-w-0 flex-1 truncate">{name}</span>
-                {chat.folder === name && <Check size={14} className="shrink-0 text-accent" />}
-              </button>
-            ))}
+            {folderNames.map((name) => {
+              const depth = name.split('/').length - 1;
+              const leaf = name.split('/').pop() ?? name;
+              return (
+                <div key={name} className={`flex items-center ${depth ? 'pl-5' : ''}`}>
+                  <button
+                    className={`${itemClass} min-w-0 flex-1`}
+                    onClick={() => {
+                      void patchChat(chat.id, { folder: name });
+                      onClose();
+                    }}
+                  >
+                    <Folder size={15} className="shrink-0 text-muted" />
+                    <span className="min-w-0 flex-1 truncate">{leaf}</span>
+                    {chat.folder === name && <Check size={14} className="shrink-0 text-accent" />}
+                  </button>
+                  {/* Подпапку заводят от корневой: «+» подставляет «Имя/» в поле
+                      ниже — путь дописывается руками, глубина остаётся двумя
+                      уровнями без отдельного диалога. */}
+                  {!depth && (
+                    <button
+                      aria-label={t('sidebar.newSubfolderAria', { name: leaf })}
+                      title={t('sidebar.newSubfolderAria', { name: leaf })}
+                      className="grid size-8 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text"
+                      onClick={(e) => {
+                        const input = e.currentTarget.closest('div.animate-fade-in')?.querySelector('input');
+                        if (input instanceof HTMLInputElement) {
+                          input.value = `${name}/`;
+                          input.focus();
+                        }
+                      }}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             <input
               placeholder={t('sidebar.newFolderPlaceholder')}
               autoFocus
               className="mx-1 mb-1 w-[calc(100%-8px)] rounded-[var(--cc-radius-sm)] bg-surface-2 px-2.5 py-2 text-base outline-none placeholder:text-muted"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const value = e.currentTarget.value.trim();
+                  // Путь «Родитель/Дитя»: нормализуем и держим глубину в два
+                  // уровня — глубже раскладка превращается в свалку.
+                  const value = e.currentTarget.value
+                    .split('/')
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join('/');
                   if (value) {
                     void patchChat(chat.id, { folder: value });
                     onClose();

@@ -183,7 +183,8 @@ const ru = {
   'sidebar.delete': 'Удалить',
   'sidebar.deleteConfirm': 'Удалить чат «{title}» со всей перепиской?',
   'sidebar.noFolder': 'Без папки',
-  'sidebar.newFolderPlaceholder': 'Новая папка',
+  'sidebar.newFolderPlaceholder': 'Папка или Папка/Подпапка',
+  'sidebar.newSubfolderAria': 'Подпапка в «{name}»',
   'persona.title': 'Системный промпт',
   'persona.description':
     'Промпт задаёт модели роль и правила на весь чат. Выберите готовую роль или напишите свой — он уходит первым сообщением в каждый запрос.',
@@ -481,7 +482,8 @@ const en: Record<TKey, string> = {
   'sidebar.delete': 'Delete',
   'sidebar.deleteConfirm': 'Delete chat "{title}" and its entire history?',
   'sidebar.noFolder': 'No folder',
-  'sidebar.newFolderPlaceholder': 'New folder',
+  'sidebar.newFolderPlaceholder': 'Folder or Folder/Subfolder',
+  'sidebar.newSubfolderAria': 'Subfolder in "{name}"',
   'persona.title': 'System prompt',
   'persona.description':
     "The prompt sets the model's role and rules for the whole chat. Pick a ready role or write your own — it goes as the first message in every request.",

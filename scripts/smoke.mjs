@@ -181,7 +181,7 @@ await p.getByRole('button', { name: 'Действия с чатом' }).first().
 await p.waitForTimeout(300);
 await p.getByRole('button', { name: 'В папку…' }).click();
 await p.waitForTimeout(300);
-await p.getByPlaceholder('Новая папка').fill('Работа');
+await p.getByPlaceholder('Папка или Папка/Подпапка').fill('Работа');
 await p.keyboard.press('Enter');
 await p.waitForTimeout(500);
 check((await p.textContent('aside')).includes('Работа'), 'чат перенесён в новую папку');
@@ -189,6 +189,25 @@ check((await p.textContent('aside')).includes('Работа'), 'чат пере�
 await p.getByText('Работа', { exact: false }).first().click();
 await p.waitForTimeout(400);
 check(!(await p.textContent('aside')).includes('Переименованный'), 'папка сворачивается');
+
+// Подпапка: путь «Работа/Внутри» — чат уходит на второй уровень, разворот
+// корня показывает подпапку, сворачивание корня прячет и её.
+await p.getByText('Работа', { exact: false }).first().click();
+await p.waitForTimeout(300);
+await p.locator('aside .group').first().hover();
+await p.getByRole('button', { name: 'Действия с чатом' }).first().click();
+await p.waitForTimeout(300);
+await p.getByRole('button', { name: 'В папку…' }).click();
+await p.waitForTimeout(300);
+await p.getByPlaceholder('Папка или Папка/Подпапка').fill('Работа/Внутри');
+await p.keyboard.press('Enter');
+await p.waitForTimeout(500);
+check((await p.textContent('aside')).includes('Внутри'), 'подпапка появилась внутри корневой');
+await p.getByText('Работа', { exact: true }).first().click();
+await p.waitForTimeout(300);
+check(!(await p.textContent('aside')).includes('Внутри'), 'свёрнутый корень прячет подпапку');
+await p.getByText('Работа', { exact: true }).first().click();
+await p.waitForTimeout(300);
 
 // Роль и системный промпт: разворачиваем папку обратно и открываем чат из неё
 await p.getByText('Работа', { exact: false }).first().click();
