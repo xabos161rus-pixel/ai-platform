@@ -158,15 +158,16 @@ export function SettingsPage() {
       <div className="cc-scroll mx-auto w-full max-w-3xl flex-1 space-y-8 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">
         <Section title={t('settings.providers')} hint={t('settings.providersHint')}>
           <div className="space-y-1.5">
-            {/* Живые провайдеры сверху; демо остаётся в списке всегда (сюда
-                возвращаются осознанно), но при живых — приглушён: это
-                инвентарь, а не рабочий инструмент. */}
-            {[...providers].sort((a, b) => Number(a.isDemo) - Number(b.isDemo)).map((p) => (
+            {/* Демо-строка существует, только пока нет ни одного настоящего
+                провайдера: с живым ключом платформа выглядит взрослой, без
+                демо-моментов. Дорога назад — удалить последний живой: актив
+                сам вернётся на демо (handleRemoveProvider), и строка всплывёт. */}
+            {(providers.some((x) => !x.isDemo) ? providers.filter((x) => !x.isDemo) : providers).map((p) => (
               <div
                 key={p.id}
                 className={`group flex items-center gap-2.5 rounded-[var(--cc-radius)] border border-hairline px-3 py-2.5 transition-colors ${
                   settings.activeProviderId === p.id ? 'bg-surface-2' : 'hover:bg-[var(--cc-fill-ghost-hover)]'
-                } ${p.isDemo && providers.some((x) => !x.isDemo) ? 'opacity-55 hover:opacity-100' : ''}`}
+                }`}
               >
                 {/* Активность — клай-точкой, тем же маркером, что у ответов в
                     чате: рамка на всю карточку кричала громче содержимого. */}

@@ -252,10 +252,55 @@ check((await p.textContent('body')).includes('Демо · подробный'), 
 // Более ранний сценарий (сравнение моделей) сделал активным провайдером
 // добавленный «Тест» без ключа — новые чаты ниже наследуют его и падают
 // синхронной ошибкой вместо демо-стрима. Возвращаем активным демо-провайдера.
-await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
-await p.waitForTimeout(500);
-await p.getByText('Демо (без ключа)').first().click();
-await p.waitForTimeout(300);
+// Демо-строки в настройках больше нет, пока жив «Тест», — возвращаем актив
+// прямой записью в IndexedDB (тот же приём, что в сцене toContext ниже).
+async function activateDemo() {
+  await p.evaluate(async () => {
+    const idb = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('ai-platform');
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    const tx = idb.transaction(['settings'], 'readwrite');
+    const settings = await new Promise((resolve, reject) => {
+      const r = tx.objectStore('settings').get('app');
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+    settings.activeProviderId = 'demo';
+    settings.defaultModel = 'demo-echo';
+    tx.objectStore('settings').put(settings);
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    idb.close();
+  });
+  await p.reload({ waitUntil: 'networkidle' });
+  await p.waitForTimeout(500);
+}
+await activateDemo();
+/* прежний inline-код заменён помощником: await p.evaluate(async () => {
+  const idb = await new Promise((resolve, reject) => {
+    const req = indexedDB.open('ai-platform');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  const tx = idb.transaction(['settings'], 'readwrite');
+  const settings = await new Promise((resolve, reject) => {
+    const r = tx.objectStore('settings').get('app');
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+  settings.activeProviderId = 'demo';
+  settings.defaultModel = 'demo-echo';
+  tx.objectStore('settings').put(settings);
+  await new Promise((resolve, reject) => {
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  idb.close();
+}); конец прежнего inline-кода */
 
 // Приветственные чипы: показываются на пустом чате, клик вставляет текст без отправки.
 await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
@@ -569,10 +614,7 @@ check(body.includes('Сообщений в контексте: 3'), 'toContext-�
 // ── T-агент: тумблер режимов, демо-цикл инструментов, трейс в истории,
 // файлы, настройки Jina. Детерминированный старт: свежий чат, демо-провайдер
 // точно активен (сценарий сравнения выше переключал активного провайдера).
-await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
-await p.waitForTimeout(500);
-await p.getByText('Демо (без ключа)').first().click();
-await p.waitForTimeout(300);
+await activateDemo();
 await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
 await p.waitForTimeout(500);
 await p.getByRole('button', { name: 'Новый чат' }).first().click();
