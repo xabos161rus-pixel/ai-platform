@@ -474,6 +474,23 @@ export async function monthSpendByChat(top = 5): Promise<ChatSpend[]> {
     .slice(0, top);
 }
 
+/** Расход по моделям за ВСЁ время — главный ответ на «куда ушли деньги».
+ *  Полный скан: страница статистики открывается по клику, не в горячем цикле. */
+export async function allSpendByModel(): Promise<ModelSpend[]> {
+  const rows = alive(await db.messages.toArray()).filter((m) => m.role === 'assistant' && m.model);
+  const byModel = new Map<string, ModelSpend>();
+  for (const m of rows) {
+    const key = m.model as string;
+    const entry = byModel.get(key) ?? { model: key, tokens: 0, rub: 0 };
+    entry.tokens += (m.tokensIn ?? 0) + (m.tokensOut ?? 0);
+    entry.rub += m.costRub ?? 0;
+    byModel.set(key, entry);
+  }
+  return [...byModel.values()]
+    .filter((e) => e.tokens !== 0 || e.rub !== 0)
+    .sort((a, b) => b.rub - a.rub || b.tokens - a.tokens);
+}
+
 export interface SpendSummary {
   rub: number;
   tokens: number;

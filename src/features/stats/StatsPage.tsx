@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
 import { ChevronLeft } from '../../components/ui/glyphs';
 import {
+  allSpendByModel,
   monthSpendByChat,
   monthSpendByModel,
   monthSpendRub,
@@ -29,6 +30,7 @@ export function StatsPage() {
   const totals = useLiveQuery(() => totalStats(), [], { chats: 0, messages: 0, tokens: 0, rub: 0 });
   const byDay = useLiveQuery(() => spendByDay(30), [], [] as DaySpend[]);
   const byModel = useLiveQuery(() => monthSpendByModel(), [], [] as ModelSpend[]);
+  const allByModel = useLiveQuery(() => allSpendByModel(), [], [] as ModelSpend[]);
   const byChat = useLiveQuery(() => monthSpendByChat(8), [], [] as ChatSpend[]);
   const months = useLiveQuery(() => spendMonths(6), [], [] as MonthSpend[]);
 
@@ -73,6 +75,37 @@ export function StatsPage() {
             <p className="-mt-6 text-[length:var(--cc-text-caption)] text-muted">
               {t('stats.chats', { n: totals.chats })} · {t('stats.messages', { n: totals.messages })}
             </p>
+
+            {allByModel.length > 0 && (
+              <Section title={t('stats.byModelAll')}>
+                {(() => {
+                  const totalRub = allByModel.reduce((n, r) => n + r.rub, 0);
+                  const totalTok = allByModel.reduce((n, r) => n + r.tokens, 0);
+                  return (
+                    <div className="space-y-2">
+                      {allByModel.map((r) => {
+                        // Доля от общего расхода; на бесплатных моделях (₽=0)
+                        // долю ведут токены — картина всё равно честная.
+                        const share = totalRub > 0 ? r.rub / totalRub : totalTok > 0 ? r.tokens / totalTok : 0;
+                        return (
+                          <div key={r.model}>
+                            <p className="flex items-baseline justify-between gap-3 text-[length:var(--cc-text-meta)]">
+                              <span className="min-w-0 truncate">{modelLabel(r.model)}</span>
+                              <span className="shrink-0 font-mono tabular-nums">
+                                {formatTokens(r.tokens)} · {r.rub > 0 ? formatCost(r.rub) : '0 ₽'}
+                              </span>
+                            </p>
+                            <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-2">
+                              <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(2, share * 100)}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </Section>
+            )}
 
             <Section title={t('settings.spendByDay')}>
               {(() => {
