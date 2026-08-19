@@ -159,6 +159,12 @@ export interface Settings {
   monthlyBudgetRub: number;
   /** Ключ Jina AI (s.jina.ai/r.jina.ai) для инструментов web_search/read_page. Пусто — запросы идут без Authorization (более жёсткий рейт-лимит). */
   jinaKey?: string;
+  /**
+   * Папки, созданные кнопкой в сайдбаре и пока пустые. Папка с чатами живёт
+   * в самих чатах (chat.folder); эта запись держит контейнер видимым, пока в
+   * него ничего не положили. Device-local, как весь settings.
+   */
+  customFolders?: string[];
   updatedAt: string;
 }
 

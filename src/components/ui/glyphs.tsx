@@ -283,6 +283,21 @@ export const Folder = glyph(
   <path d="M3.5 6.9A1.8 1.8 0 0 1 5.3 5.1h3.5l2 2.3h7.9a1.8 1.8 0 0 1 1.8 1.8v7.9a1.8 1.8 0 0 1-1.8 1.8H5.3a1.8 1.8 0 0 1-1.8-1.8Z" />,
 );
 
+/** Новая папка: контур папки + плюс в теле. */
+export const FolderPlus = glyph(
+  'folder-plus',
+  <>
+    <path d="M3.5 6.9A1.8 1.8 0 0 1 5.3 5.1h3.5l2 2.3h7.9a1.8 1.8 0 0 1 1.8 1.8v7.9a1.8 1.8 0 0 1-1.8 1.8H5.3a1.8 1.8 0 0 1-1.8-1.8Z" />
+    <path d="M12 10.2v5M9.5 12.7h5" />
+  </>,
+);
+
+/** Статистика: три столбика разной высоты — без осей и рамок. */
+export const ChartBars = glyph(
+  'chart-bars',
+  <path d="M5.4 19.5v-6.3M12 19.5V4.5M18.6 19.5v-9.8" />,
+);
+
 export const FolderInput = glyph(
   'folder-input',
   <>

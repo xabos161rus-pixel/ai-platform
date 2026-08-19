@@ -12,6 +12,8 @@ import { runSync } from './lib/sync/engine';
 // экран — самый частый путь пользователя. ChatPage ничего из features/settings
 // не импортирует, поэтому граница чанка проходит здесь чисто.
 const SettingsPage = lazy(() => import('./features/settings/SettingsPage'));
+// Статистика — тоже по клику и тоже вне первого экрана.
+const StatsPage = lazy(() => import('./features/stats/StatsPage'));
 
 function ThemeApplier() {
   const settings = useLiveQuery(() => db.settings.get('app'), []);
@@ -115,6 +117,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<ChatPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/stats" element={<StatsPage />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>

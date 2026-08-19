@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import {
+  ChartBars,
   Check,
   ChevronRight,
   Folder,
   FolderInput,
+  FolderPlus,
   SquarePen,
   Columns2,
   MoreHorizontal,
@@ -22,6 +24,8 @@ import type { Chat } from '../../db/types';
 import { listFolders, patchChat, removeChat } from '../../lib/ai/chatRepo';
 import { searchAll, type SearchHit } from '../../lib/search';
 import { t, useT } from '../../lib/i18n';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
 
 interface Props {
   chats: Chat[];
@@ -103,6 +107,10 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
     }
   });
   const [menuFor, setMenuFor] = useState<MenuTarget | null>(null);
+  // Инлайн-создание папки кнопкой в шапке сайдбара; пустые папки живут в
+  // settings.customFolders, пока в них не положили чат.
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const customFolders = useLiveQuery(async () => (await db.settings.get('app'))?.customFolders ?? [], [], [] as string[]);
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   // Поиск по заголовку и содержимому — debounce 200мс. setState только в
@@ -147,6 +155,14 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
       else node.items.push(c);
       roots.set(root, node);
     }
+    // Пустые созданные папки — тоже узлы дерева (счётчик 0).
+    for (const name of customFolders) {
+      const [root, ...tail] = name.split('/');
+      const sub = tail.join('/');
+      const node = roots.get(root) ?? { items: [], children: new Map<string, Chat[]>() };
+      if (sub && !node.children.has(sub)) node.children.set(sub, []);
+      roots.set(root, node);
+    }
     for (const root of [...roots.keys()].sort((a, b) => a.localeCompare(b, 'ru'))) {
       const node = roots.get(root)!;
       out.push({
@@ -166,9 +182,9 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
       else out.push({ kind: 'label', label, items: [c] });
     }
     return out;
-  }, [chats, searching, t]);
+  }, [chats, searching, customFolders, t]);
 
-  const folderNames = useMemo(() => listFolders(chats), [chats]);
+  const folderNames = useMemo(() => [...new Set([...listFolders(chats), ...customFolders])].sort((a, b) => a.localeCompare(b, 'ru')), [chats, customFolders]);
 
   return (
     <aside
@@ -188,6 +204,14 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
           {t('chat.newChat')}
           <kbd className="ml-auto hidden font-mono text-[length:var(--cc-text-caption)] font-normal text-muted/50 lg:inline">⌘N</kbd>
         </button>
+        <button
+          aria-label={t('sidebar.newFolderAria')}
+          title={t('sidebar.newFolderAria')}
+          onClick={() => setCreatingFolder((v) => !v)}
+          className="grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
+        >
+          <FolderPlus size={17} />
+        </button>
         {overlay && (
           <button
             aria-label={t('common.close')}
@@ -199,6 +223,32 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
         )}
       </div>
 
+      {creatingFolder && (
+        <div className="px-3 pb-1">
+          <input
+            autoFocus
+            placeholder={t('sidebar.newFolderPlaceholder')}
+            className="w-full rounded-[var(--cc-radius-sm)] bg-surface-2 px-2.5 py-2 text-sm outline-none placeholder:text-muted"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setCreatingFolder(false);
+              if (e.key !== 'Enter') return;
+              const value = e.currentTarget.value
+                .split('/')
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .slice(0, 2)
+                .join('/');
+              if (!value) return;
+              void db.settings.get('app').then((st) => {
+                const setFolders = new Set([...(st?.customFolders ?? []), value]);
+                return db.settings.update('app', { customFolders: [...setFolders], updatedAt: new Date().toISOString() });
+              });
+              setCreatingFolder(false);
+            }}
+            onBlur={() => setCreatingFolder(false)}
+          />
+        </div>
+      )}
       <div className="px-3 pb-2">
         <div className="flex items-center gap-2 rounded-[var(--cc-radius)] bg-surface-2 px-2.5">
           <Search size={15} className="shrink-0 text-muted" />
@@ -260,9 +310,31 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
                       />
                       <Folder size={14} className="shrink-0 text-muted" />
                       <span className="min-w-0 flex-1 truncate text-sm">{g.label}</span>
-                      <span className="ml-auto shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">
-                        {g.items.length}
-                      </span>
+                      {(() => {
+                        const total = g.items.length + (g.children ?? []).reduce((n, sub) => n + sub.items.length, 0);
+                        return total > 0 ? (
+                          <span className="ml-auto shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">{total}</span>
+                        ) : (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label={t('sidebar.removeFolderAria', { name: g.label })}
+                            title={t('sidebar.removeFolderAria', { name: g.label })}
+                            className="ml-auto grid size-7 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void db.settings.get('app').then((st) =>
+                                db.settings.update('app', {
+                                  customFolders: (st?.customFolders ?? []).filter((f) => f !== g.label && !f.startsWith(`${g.label}/`)),
+                                  updatedAt: new Date().toISOString(),
+                                }),
+                              );
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </span>
+                        );
+                      })()}
                     </button>
                     {!isCollapsed &&
                       g.items.map((c) => (
@@ -341,13 +413,22 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
         )}
       </nav>
 
-      <Link
-        to="/settings"
-        className="flex min-h-[var(--cc-touch)] items-center gap-2 border-t border-hairline px-4 text-sm text-muted transition-colors hover:text-text"
-      >
-        <Settings size={17} />
-        {t('nav.settings')}
-      </Link>
+      <div className="border-t border-hairline">
+        <Link
+          to="/stats"
+          className="flex min-h-[var(--cc-touch)] items-center gap-2 px-4 text-sm text-muted transition-colors hover:text-text"
+        >
+          <ChartBars size={17} />
+          {t('nav.stats')}
+        </Link>
+        <Link
+          to="/settings"
+          className="flex min-h-[var(--cc-touch)] items-center gap-2 px-4 text-sm text-muted transition-colors hover:text-text"
+        >
+          <Settings size={17} />
+          {t('nav.settings')}
+        </Link>
+      </div>
 
       {menuFor && (
         <RowMenu

@@ -474,6 +474,35 @@ export async function monthSpendByChat(top = 5): Promise<ChatSpend[]> {
     .slice(0, top);
 }
 
+export interface SpendSummary {
+  rub: number;
+  tokens: number;
+}
+
+/** Сводка за сегодня (локальные сутки). */
+export async function todaySpend(): Promise<SpendSummary> {
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  const rows = alive(await messagesSince(from.toISOString())).filter((m) => m.role === 'assistant');
+  return {
+    rub: rows.reduce((n, m) => n + (m.costRub ?? 0), 0),
+    tokens: rows.reduce((n, m) => n + (m.tokensIn ?? 0) + (m.tokensOut ?? 0), 0),
+  };
+}
+
+/** Итоги за всё время: чаты, сообщения, токены, рубли. Полный скан — страница
+ *  статистики открывается по клику, не в горячем цикле. */
+export async function totalStats(): Promise<{ chats: number; messages: number; tokens: number; rub: number }> {
+  const [allChats, allMessages] = await Promise.all([db.chats.toArray(), db.messages.toArray()]);
+  const liveMessages = alive(allMessages);
+  return {
+    chats: alive(allChats).length,
+    messages: liveMessages.length,
+    tokens: liveMessages.reduce((n, m) => n + (m.tokensIn ?? 0) + (m.tokensOut ?? 0), 0),
+    rub: liveMessages.reduce((n, m) => n + (m.costRub ?? 0), 0),
+  };
+}
+
 export interface MonthSpend {
   month: string; // 'YYYY-MM'
   rub: number;

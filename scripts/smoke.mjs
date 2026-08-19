@@ -901,6 +901,25 @@ check((await p.textContent('body')).includes('Консилиум ·'), 'конс
 // Чистим режим, чтобы не влиять на будущие прогоны смоука.
 await p.getByRole('button', { name: 'Консилиум моделей' }).click().catch(() => {});
 
+// СТАТИСТИКА: страница открывается из сайдбара, сводки и разделы на месте.
+await p.getByRole('link', { name: 'Статистика' }).click();
+await p.waitForTimeout(700);
+check((await p.textContent('body')).includes('Этот месяц'), 'статистика: сводка месяца видна');
+check((await p.textContent('body')).includes('По моделям за месяц'), 'статистика: разбивка по моделям видна');
+await p.goBack({ waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+
+// ПАПКИ ИЗ САЙДБАРА: кнопка создаёт пустую папку, корзинка её убирает.
+await p.getByRole('button', { name: 'Новая папка' }).click();
+await p.waitForTimeout(200);
+await p.getByPlaceholder('Папка или Папка/Подпапка').fill('Тестпапка');
+await p.keyboard.press('Enter');
+await p.waitForTimeout(400);
+check((await p.textContent('aside')).includes('Тестпапка'), 'пустая папка создана кнопкой сайдбара');
+await p.getByLabel('Удалить пустую папку «Тестпапка»').click();
+await p.waitForTimeout(400);
+check(!(await p.textContent('aside')).includes('Тестпапка'), 'пустая папка удалена корзинкой');
+
 // СПЛИТ: второй чат рядом (десктоп): из меню строки сайдбара, полная
 // независимость панелей, закрытие крестиком.
 await p.setViewportSize({ width: 1400, height: 800 });
