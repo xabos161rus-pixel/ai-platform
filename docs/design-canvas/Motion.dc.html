@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+    a { color: oklch(0.672 0.131 38.8); } a:hover { color: oklch(0.770 0.101 43.6); }
+    .mono { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    @keyframes slide { 0%, 12% { transform: translateX(0); } 50%, 62% { transform: translateX(210px); } 100% { transform: translateX(0); } }
+    .run-out { animation: slide 3.2s cubic-bezier(0.165, 0.84, 0.44, 1) infinite; }
+    .run-snap { animation: slide 3.2s cubic-bezier(0.32, 0.72, 0, 1) infinite; }
+    .run-lin { animation: slide 3.2s linear infinite; }
+  </style>
+</helmet>
+<div style="width: 980px; background: oklch(0.185 0.004 75); color: oklch(0.955 0.003 75); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 30px;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div class="mono" style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.675 0.008 75);">Дизайн-система v2 · 03</div>
+    <div style="font-size: 27px; font-weight: 650; letter-spacing: -0.015em;">Движение</div>
+    <div style="font-size: 15px; line-height: 1.55; color: oklch(0.675 0.008 75); max-width: 640px;">Токены времени и кривых в системе есть — и не используются в компонентах ни разу. Всё движение приложения сейчас это тихий дефолт Tailwind: 150 мс, кривая ease. Токены надо не придумывать, а начать применять.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="font-size: 17px; font-weight: 650;">Кривые в работе</div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 20px; background: oklch(0.222 0.005 75); border-radius: 10.6px; padding: 16px 20px;">
+        <div style="width: 210px; flex-shrink: 0;"><div class="mono" style="font-size: 12px;">ease (дефолт Tailwind)</div><div style="font-size: 11px; color: oklch(0.675 0.008 75);">сейчас — везде</div></div>
+        <div style="flex-grow: 1; height: 26px; position: relative;"><div class="run-lin" style="width: 26px; height: 26px; border-radius: 7px; background: oklch(0.34 0.006 75);"></div></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 20px; background: oklch(0.222 0.005 75); border-radius: 10.6px; padding: 16px 20px;">
+        <div style="width: 210px; flex-shrink: 0;"><div class="mono" style="font-size: 12px; color: oklch(0.770 0.101 43.6);">--cc-ease-out</div><div style="font-size: 11px; color: oklch(0.675 0.008 75);">появление, раскрытие, наведение</div></div>
+        <div style="flex-grow: 1; height: 26px; position: relative;"><div class="run-out" style="width: 26px; height: 26px; border-radius: 7px; background: oklch(0.672 0.131 38.8);"></div></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 20px; background: oklch(0.222 0.005 75); border-radius: 10.6px; padding: 16px 20px;">
+        <div style="width: 210px; flex-shrink: 0;"><div class="mono" style="font-size: 12px; color: oklch(0.770 0.101 43.6);">--cc-ease-snap</div><div style="font-size: 11px; color: oklch(0.675 0.008 75);">шиты, панели, крупные сдвиги</div></div>
+        <div style="flex-grow: 1; height: 26px; position: relative;"><div class="run-snap" style="width: 26px; height: 26px; border-radius: 7px; background: oklch(0.770 0.101 43.6);"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: oklch(1 0 0 / 0.07);"></div>
+
+  <div style="display: flex; gap: 30px;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px;">
+      <div style="font-size: 17px; font-weight: 650;">Кому какое время</div>
+      <div style="display: flex; flex-direction: column; gap: 0; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6);">60 мс · fast</span><span style="color: oklch(0.675 0.008 75);">цвет при наведении, нажатие</span></div>
+        <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6);">120 мс · snap</span><span style="color: oklch(0.675 0.008 75);">меню, подсказки, чипы</span></div>
+        <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6);">200 мс · base</span><span style="color: oklch(0.675 0.008 75);">шиты, страницы, крупное</span></div>
+        <div style="display: flex; justify-content: space-between; padding: 11px 0;"><span class="mono" style="color: oklch(0.72 0.15 150);">+ exit = 0.7 × входа</span><span style="color: oklch(0.675 0.008 75);">уход всегда быстрее прихода</span></div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px;">
+      <div style="font-size: 17px; font-weight: 650;">Чего нет совсем</div>
+      <div style="font-size: 13px; line-height: 1.75; color: oklch(0.675 0.008 75);">
+        <div>· Ухода. Шит и тост появляются плавно, а исчезают скачком: <span class="mono" style="font-size: 12px;">if (!open) return null</span>.</div>
+        <div>· Анимации раскрытия — «мысли модели» и ход консилиума дёргаются.</div>
+        <div>· Перехода темы: смена даёт вспышку во весь экран.</div>
+        <div>· Уважения к <span class="mono" style="font-size: 12px;">prefers-reduced-motion</span> у мигающей каретки и у нажатий.</div>
+      </div>
+      <div style="margin-top: 4px; background: oklch(0.159 0 0); border-radius: 6.4px; padding: 14px;">
+        <div class="mono" style="font-size: 11px; line-height: 1.7; color: oklch(0.675 0.008 75);">.cc-exit {<br>&nbsp;&nbsp;animation: fade-out<br>&nbsp;&nbsp;&nbsp;&nbsp;calc(var(--cc-dur-base) * 0.7)<br>&nbsp;&nbsp;&nbsp;&nbsp;var(--cc-ease-snap) forwards;<br>}</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

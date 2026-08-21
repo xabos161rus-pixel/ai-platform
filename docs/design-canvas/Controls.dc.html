@@ -1,0 +1,102 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+    a { color: oklch(0.672 0.131 38.8); } a:hover { color: oklch(0.770 0.101 43.6); }
+    .mono { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    .btn { border: 0; border-radius: 10.6px; font: inherit; font-size: 14px; font-weight: 550; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; transition: background-color 60ms cubic-bezier(0.165,0.84,0.44,1), box-shadow 60ms cubic-bezier(0.165,0.84,0.44,1); }
+    .btn-md { height: 38px; padding: 0 16px; }
+    .btn-sm { height: 30px; padding: 0 12px; font-size: 13px; border-radius: 6.4px; }
+    .btn-lg { height: 46px; padding: 0 20px; font-size: 15px; }
+    .btn-primary { background: oklch(0.672 0.131 38.8); color: oklch(0.16 0.02 40); box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.14); }
+    .btn-primary:hover { background: oklch(0.712 0.128 39.5); }
+    .btn-secondary { background: oklch(0.255 0.006 75); color: oklch(0.955 0.003 75); box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05); }
+    .btn-secondary:hover { background: oklch(0.292 0.006 75); }
+    .btn-ghost { background: transparent; color: oklch(0.675 0.008 75); }
+    .btn-ghost:hover { background: oklch(1 0 0 / 0.05); color: oklch(0.955 0.003 75); }
+    .btn-danger { background: oklch(0.68 0.17 25 / 0.16); color: oklch(0.78 0.15 25); }
+    .btn-danger:hover { background: oklch(0.68 0.17 25 / 0.26); }
+    .btn:disabled { background: oklch(0.212 0.004 75); color: oklch(0.48 0.006 75); box-shadow: none; cursor: not-allowed; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.7s linear infinite; }
+  </style>
+</helmet>
+<div style="width: 980px; background: oklch(0.185 0.004 75); color: oklch(0.955 0.003 75); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 30px;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div class="mono" style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.675 0.008 75);">Дизайн-система v2 · 05</div>
+    <div style="font-size: 27px; font-weight: 650; letter-spacing: -0.015em;">Кнопки и контролы</div>
+    <div style="font-size: 15px; line-height: 1.55; color: oklch(0.675 0.008 75); max-width: 660px;">Компонент кнопки существует, но используется в пяти файлах — при этом в коде 86 сырых button со своими классами. Из-за этого одна и та же кнопка в чате и в настройках выглядит по-разному. Компонент должен покрывать варианты, размеры, иконочный режим и загрузку — тогда сырые исчезнут сами.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 18px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div class="mono" style="width: 96px; font-size: 11px; color: oklch(0.675 0.008 75);">primary</div>
+      <button class="btn btn-primary btn-sm">Отправить</button>
+      <button class="btn btn-primary btn-md">Отправить</button>
+      <button class="btn btn-primary btn-lg">Отправить</button>
+      <button class="btn btn-primary btn-md"><span class="spin" style="width: 13px; height: 13px; border: 2px solid oklch(0.16 0.02 40 / 0.3); border-top-color: oklch(0.16 0.02 40); border-radius: 999px; display: block;"></span>Идёт запрос</button>
+      <button class="btn btn-primary btn-md" disabled>Выключено</button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div class="mono" style="width: 96px; font-size: 11px; color: oklch(0.675 0.008 75);">secondary</div>
+      <button class="btn btn-secondary btn-sm">Отмена</button>
+      <button class="btn btn-secondary btn-md">Отмена</button>
+      <button class="btn btn-secondary btn-lg">Отмена</button>
+      <button class="btn btn-secondary btn-md" style="width: 38px; padding: 0;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <div class="mono" style="width: 96px; font-size: 11px; color: oklch(0.675 0.008 75);">ghost</div>
+      <button class="btn btn-ghost btn-md">Пропустить</button>
+      <button class="btn btn-ghost btn-md" style="width: 38px; padding: 0;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg></button>
+      <div class="mono" style="width: 66px; font-size: 11px; color: oklch(0.675 0.008 75); margin-left: 20px;">danger</div>
+      <button class="btn btn-danger btn-md">Удалить ветку</button>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: oklch(1 0 0 / 0.07);"></div>
+
+  <div style="display: flex; gap: 30px;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-size: 17px; font-weight: 650;">Поля</div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="background: oklch(0.222 0.005 75); border: 1px solid oklch(1 0 0 / 0.07); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; color: oklch(0.55 0.008 75);">Покой</div>
+        <div style="background: oklch(0.222 0.005 75); border: 1px solid oklch(0.672 0.131 38.8); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; box-shadow: 0 0 0 3px oklch(0.672 0.131 38.8 / 0.14);">В фокусе<span style="color: oklch(0.672 0.131 38.8);">|</span></div>
+        <div style="background: oklch(0.222 0.005 75); border: 1px solid oklch(0.68 0.17 25); border-radius: 10.6px; padding: 11px 14px; font-size: 14px;">Ошибка — адрес без схемы</div>
+        <div style="font-size: 12px; color: oklch(0.78 0.15 25); padding-left: 2px;">Адрес API должен начинаться с https://</div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Состояния ошибки у полей сейчас нет вообще: неверный адрес провайдера виден только тостом, который через 2,6 секунды исчезает.</div>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-size: 17px; font-weight: 650;">Чипы и переключатели</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <div style="background: oklch(0.255 0.006 75); border-radius: 999px; padding: 7px 14px; font-size: 13px;">deepseek-chat</div>
+        <div style="background: oklch(0.672 0.131 38.8 / 0.16); color: oklch(0.770 0.101 43.6); border: 1px solid oklch(0.672 0.131 38.8 / 0.5); border-radius: 999px; padding: 6px 13px; font-size: 13px;">deepseek-reasoner</div>
+        <div style="background: oklch(0.255 0.006 75); border-radius: 999px; padding: 7px 14px; font-size: 13px; color: oklch(0.55 0.008 75);">+ ещё 12</div>
+      </div>
+      <div style="display: inline-flex; background: oklch(0.222 0.005 75); border-radius: 10.6px; padding: 3px; gap: 2px; align-self: flex-start;">
+        <div style="background: oklch(0.672 0.131 38.8); color: oklch(0.16 0.02 40); border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 550;">Тёмная</div>
+        <div style="border-radius: 8px; padding: 8px 16px; font-size: 13px; color: oklch(0.675 0.008 75);">Светлая</div>
+        <div style="border-radius: 8px; padding: 8px 16px; font-size: 13px; color: oklch(0.675 0.008 75);">Как в системе</div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Выбранный сегмент читается сразу: заливка акцентом и тёмный текст, а не белый по светло-терракотовому.</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

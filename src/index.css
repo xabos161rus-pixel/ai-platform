@@ -25,7 +25,7 @@
   --app-bg: oklch(0.185 0.004 75);
   --app-surface: oklch(0.232 0.005 75);
   --app-surface-2: oklch(0.272 0.006 75);
-  --app-elevated: oklch(0.248 0.005 75);
+  --app-elevated: oklch(0.292 0.006 75);
   --app-border: oklch(0.34 0.006 75);
   --app-hairline: oklch(1 0 0 / 0.07);
   --app-text: oklch(0.955 0.003 75);
@@ -39,6 +39,28 @@
   --cc-code-bg: oklch(0.159 0 0);
   --cc-fill-control: oklch(1 0 0 / 0.10);
   --cc-fill-ghost-hover: oklch(1 0 0 / 0.05);
+
+  /* Отклик интерактива — заливкой, а не прозрачностью: гашение opacity
+     тушит вместе с фоном текст и иконку, элемент выглядит выключенным,
+     а не отзывчивым. */
+  --cc-fill-hover: oklch(1 0 0 / 0.07);
+  --cc-fill-press: oklch(0 0 0 / 0.14);
+  --cc-fill-selected: oklch(0.672 0.131 38.8 / 0.14);
+  --cc-fill-disabled: oklch(1 0 0 / 0.03);
+  /* Акцент в тёмной теме светлый (L 0.672): белый текст по нему даёт ~2.4:1
+     и норму не проходит, тёмный — около 6:1. */
+  --cc-on-accent: oklch(0.16 0.02 40);
+  --cc-accent-hover: oklch(0.712 0.128 39.5);
+
+  /* Высота: в тёмной теме тень чёрным по почти-чёрному не читается —
+     край поверхности отделяет именно верхний блик. */
+  --cc-elev-rest: inset 0 1px 0 oklch(1 0 0 / 0.04);
+  --cc-elev-raised: inset 0 1px 0 oklch(1 0 0 / 0.06), 0 2px 6px oklch(0 0 0 / 0.28);
+  --cc-elev-overlay: inset 0 1px 0 oklch(1 0 0 / 0.07), 0 8px 24px oklch(0 0 0 / 0.36),
+    0 2px 6px oklch(0 0 0 / 0.22);
+  --cc-elev-modal: inset 0 1px 0 oklch(1 0 0 / 0.08), 0 24px 64px -12px oklch(0 0 0 / 0.55),
+    0 4px 12px oklch(0 0 0 / 0.3);
+  --cc-scrim: oklch(0.13 0.004 75 / 0.62);
 
   /* Радиусы мельче обычных мобильных: CLI-эстетика — про прямые линии. */
   --cc-radius: 0.625rem;
@@ -55,6 +77,27 @@
      читался «огромным» рядом с плотным машинным слоем. 0.882rem × 17px ≈ 15px —
      плотность DeepSeek/ChatGPT; мысли и метаданные остаются ступенью ниже. */
   --cc-text-body: 0.882rem;
+  /* Ступени выше body: до сих пор всё крупное жило мимо шкалы, россыпью
+     tailwind-классов. */
+  --cc-text-lg: 1rem;
+  --cc-text-h2: 1.12rem;
+  --cc-text-h1: 1.25rem;
+  --cc-text-display: 1.6rem;
+
+  /* Стек упоминался в .cc-md как var(--font-mono, …) и нигде не объявлялся. */
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+
+  /* Радиусы панелей: без них Sheet брал rounded-2xl мимо системы. */
+  --cc-radius-lg: 0.875rem;
+  --cc-radius-xl: 1.125rem;
+
+  /* Порядок слоёв: до этого шесть чисел (40/50/60/61/80/90) по шести файлам. */
+  --cc-z-sticky: 10;
+  --cc-z-popover: 20;
+  --cc-z-scrim: 30;
+  --cc-z-sheet: 40;
+  --cc-z-full: 50;
+  --cc-z-toast: 60;
 
   --cc-dur-fast: 60ms;
   --cc-dur-snap: 120ms;
@@ -87,6 +130,23 @@
      фона — заливка hover была не видна. 0.07 держит ту же пропорцию к
      cc-fill-control, что и в тёмной теме (0.05:0.10), но уже читается. */
   --cc-fill-ghost-hover: oklch(0.191 0.002 106 / 0.07);
+
+  --cc-fill-hover: oklch(0.191 0.002 106 / 0.06);
+  --cc-fill-press: oklch(0.191 0.002 106 / 0.12);
+  --cc-fill-selected: oklch(0.520 0.132 38.5 / 0.10);
+  --cc-fill-disabled: oklch(0.191 0.002 106 / 0.05);
+  /* Светлый акцент темнее (L 0.520) — здесь по нему держится белый. */
+  --cc-on-accent: oklch(0.99 0.004 90);
+  --cc-accent-hover: oklch(0.475 0.132 38.5);
+
+  /* На белом поверхность отделяет тень, а не блик: верхний highlight здесь
+     не работает, зато тень видна. */
+  --cc-elev-rest: 0 1px 2px oklch(0 0 0 / 0.04);
+  --cc-elev-raised: 0 2px 6px oklch(0 0 0 / 0.07), 0 1px 2px oklch(0 0 0 / 0.05);
+  --cc-elev-overlay: 0 8px 24px -4px oklch(0 0 0 / 0.13), 0 2px 6px oklch(0 0 0 / 0.07);
+  --cc-elev-modal: 0 24px 64px -16px oklch(0 0 0 / 0.22), 0 4px 12px oklch(0 0 0 / 0.09);
+  --cc-scrim: oklch(0.35 0.006 85 / 0.35);
+
   --shadow-pop: 0 4px 8px oklch(0 0 0 / 0.06), 0 12px 28px -2px oklch(0 0 0 / 0.12);
   color-scheme: light;
 }
@@ -118,7 +178,8 @@ body {
 /* Выделение текста — фирменный клай, а не системный синий: единственное
    место, где браузерный дефолт ещё торчал из чужой палитры. */
 ::selection {
-  background: oklch(0.672 0.131 38.8 / 0.35);
+  background: color-mix(in oklch, var(--app-accent) 32%, transparent);
+  color: var(--app-text);
 }
 
 /* Фокус: акцентное кольцо ТОЛЬКО с клавиатуры. Синий UA-outline браузера
@@ -127,7 +188,6 @@ body {
 :focus-visible {
   outline: 2px solid var(--app-accent);
   outline-offset: 2px;
-  border-radius: var(--cc-radius-sm);
 }
 :focus:not(:focus-visible) {
   outline: none;
@@ -166,16 +226,53 @@ select {
 
 @media (hover: hover) and (pointer: fine) {
   @layer base {
-    button:hover,
-    a:hover {
+    button:not(.cc-hit):hover,
+    a:not(.cc-hit):hover {
       opacity: 0.85;
     }
     button,
     a {
-      transition-property: opacity;
-      transition-duration: var(--cc-dur-snap);
+      transition-property: opacity, background-color, color, box-shadow;
+      transition-duration: var(--cc-dur-fast);
+      transition-timing-function: var(--cc-ease-out);
     }
   }
+}
+
+/* Интерактивная зона с честным откликом: наведение подсвечивает поверхность,
+   нажатие утапливает. Заменяет глобальное гашение прозрачности там, где
+   размечено. */
+.cc-hit {
+  transition: background-color var(--cc-dur-fast) var(--cc-ease-out),
+    color var(--cc-dur-fast) var(--cc-ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .cc-hit:hover:not(:disabled) {
+    background-color: var(--cc-fill-hover);
+  }
+}
+.cc-hit:active:not(:disabled) {
+  background-color: var(--cc-fill-press);
+}
+.cc-hit:disabled {
+  background-color: transparent;
+  color: var(--app-muted);
+  cursor: not-allowed;
+}
+
+/* Двойной тап по кнопке на iOS зумит страницу вместо второго нажатия. */
+button,
+a,
+[role='button'],
+label,
+summary {
+  touch-action: manipulation;
+}
+
+/* Цифры в счётчиках и ценах меняются на каждом нажатии клавиши —
+   пропорциональные дёргают всю строку. */
+.cc-num {
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes fade-in {
@@ -192,9 +289,40 @@ select {
   55%, 100% { opacity: 0.15; }
 }
 
-.animate-fade-in { animation: fade-in var(--cc-dur-base) ease; }
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+@keyframes sheet-down {
+  to { transform: translateY(100%); }
+}
+@keyframes cc-pop-in {
+  from { opacity: 0; transform: scale(0.97) translateY(3px); }
+}
+
+/* Уход всегда быстрее прихода: 0.7 от длительности входа. */
+.animate-fade-in { animation: fade-in var(--cc-dur-base) var(--cc-ease-out); }
+.animate-fade-out { animation: fade-out calc(var(--cc-dur-base) * 0.7) var(--cc-ease-snap) forwards; }
 .animate-sheet-up { animation: sheet-up 0.25s var(--cc-ease-snap); }
+.animate-sheet-down { animation: sheet-down 0.18s var(--cc-ease-snap) forwards; }
+.animate-pop-in { animation: cc-pop-in var(--cc-dur-snap) var(--cc-ease-out); }
 .animate-caret { animation: caret 1s steps(1, end) infinite; }
+
+/* Скелетон: до сих пор ленивые страницы открывались пустым экраном. */
+@keyframes cc-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.cc-skeleton {
+  border-radius: var(--cc-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--app-surface) 0%,
+    var(--app-surface-2) 50%,
+    var(--app-surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: cc-shimmer 1.4s linear infinite;
+}
 
 /* Появление сообщений в ленте — только на монтировании (ключ = id
    сообщения), набор текста в композере эту анимацию не задевает. */
@@ -206,7 +334,14 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .animate-msg-in,
   .animate-fade-in,
-  .animate-sheet-up { animation: none; }
+  .animate-fade-out,
+  .animate-sheet-up,
+  .animate-sheet-down,
+  .animate-pop-in,
+  .animate-caret,
+  .cc-skeleton { animation: none; }
+  /* Нажатие масштабом раскидано по всему приложению активными классами. */
+  .active\:scale-\[0\.98\]:active { transform: none; }
 }
 
 /* Аврора чата: два мягких пятна акцентного цвета на fixed-слое позади
@@ -235,6 +370,7 @@ select {
 .cc-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
 .cc-scroll::-webkit-scrollbar-thumb { background: var(--cc-fill-control); border-radius: 3px; }
 .cc-scroll::-webkit-scrollbar-track { background: transparent; }
+.cc-scroll::-webkit-scrollbar-thumb:hover { background: var(--app-muted); }
 
 /* ── Разметка ответа ────────────────────────────────────────────────
    Моно только на машинном слое (код, счётчики, метаданные). В CLI моно всё,
@@ -261,9 +397,9 @@ select {
   line-height: 1.3;
   letter-spacing: -0.01em;
 }
-.cc-md h1 { font-size: 1.25rem; }
-.cc-md h2 { font-size: 1.12rem; }
-.cc-md h3 { font-size: 1rem; }
+.cc-md h1 { font-size: var(--cc-text-h1); }
+.cc-md h2 { font-size: var(--cc-text-h2); }
+.cc-md h3 { font-size: var(--cc-text-lg); }
 .cc-md ul { list-style: disc; padding-left: 1.35em; }
 .cc-md ol { list-style: decimal; padding-left: 1.35em; }
 .cc-md li { margin: 0.2em 0; }
@@ -312,12 +448,22 @@ select {
 }
 .cc-md th,
 .cc-md td {
-  border: 1px solid var(--app-hairline);
-  padding: 0.35em 0.6em;
+  border-bottom: 1px solid var(--app-hairline);
+  padding: 0.42em 0.7em;
   text-align: left;
   white-space: nowrap;
 }
-.cc-md th { font-weight: 600; background-color: var(--app-surface-2); }
+.cc-md tbody tr:last-child td { border-bottom: 0; }
+.cc-md th {
+  font-weight: 600;
+  background-color: var(--app-surface-2);
+  border-bottom-color: var(--app-border);
+}
+/* На узком экране таблица шире экрана всегда: перенос лучше карусели. */
+@media (max-width: 640px) {
+  .cc-md th,
+  .cc-md td { white-space: normal; min-width: 5.5em; }
+}
 
 /* ── Подсветка кода ─────────────────────────────────────────────────
    Своя тема вместо готовой из highlight.js: стандартные темы написаны под
@@ -366,8 +512,15 @@ select {
 :root.light .hljs-built_in,
 :root.light .hljs-type,
 :root.light .hljs-variable { color: oklch(0.50 0.10 75); }
+:root.light .hljs-symbol,
+:root.light .hljs-bullet,
+:root.light .hljs-link,
+:root.light .hljs-template-variable { color: oklch(0.50 0.10 75); }
+:root.light .hljs-meta .hljs-string { color: oklch(0.46 0.12 150); }
 :root.light .hljs-title,
+:root.light .hljs-title.function_,
 :root.light .hljs-attr,
+:root.light .hljs-selector-id,
 :root.light .hljs-selector-class { color: oklch(0.48 0.10 250); }
 
 /* Заголовок блока кода с языком — как в терминале, слева сверху. */

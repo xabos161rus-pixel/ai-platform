@@ -14,6 +14,31 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>AI Platform</title>
+    <!-- Тема живёт в IndexedDB, а его API асинхронный: до первого рендера
+         React прочитать её нельзя, и у светлого пользователя первый кадр
+         всегда был тёмным. Выбор зеркалится в localStorage (ThemeApplier),
+         отсюда читается синхронно — вспышки нет. -->
+    <script>
+      (function () {
+        try {
+          var pick = localStorage.getItem('cc-theme') || 'dark';
+          var light =
+            pick === 'light' ||
+            (pick === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches);
+          if (light) {
+            document.documentElement.classList.add('light');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#faf9f5');
+            // В standalone iOS читает эту мету только при холодном старте,
+            // поэтому правим здесь, а не в React.
+            var bar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+            if (bar) bar.setAttribute('content', 'default');
+          }
+        } catch (e) {
+          /* приватный режим без localStorage — остаёмся на тёмной */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

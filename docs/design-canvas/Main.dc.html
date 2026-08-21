@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+    a { color: oklch(0.672 0.131 38.8); } a:hover { color: oklch(0.770 0.101 43.6); }
+    .mono { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; }
+  </style>
+</helmet>
+<div style="width: 980px; background: oklch(0.185 0.004 75); color: oklch(0.955 0.003 75); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 34px;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div class="mono" style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.675 0.008 75);">Дизайн-система v2 · 01</div>
+    <div style="font-size: 27px; font-weight: 650; letter-spacing: -0.015em;">Поверхности и свет</div>
+    <div style="font-size: 15px; line-height: 1.55; color: oklch(0.675 0.008 75); max-width: 620px;">Сейчас иерархия поверхностей сломана: слой «приподнятый» физически темнее заливки контрола, поэтому поповеры и меню читаются как провал, а не как подъём. Тень в системе одна на всё приложение и в тёмной теме почти невидима — чёрное по почти-чёрному.</div>
+  </div>
+
+  <div style="display: flex; gap: 28px;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px;">
+      <div class="mono" style="font-size: 12px; color: oklch(0.68 0.17 25);">БЫЛО · светлота не по порядку</div>
+      <div style="display: flex; flex-direction: column; gap: 0;">
+        <div style="background: oklch(0.185 0.004 75); border: 1px solid oklch(1 0 0 / 0.07); padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span>bg</span><span class="mono" style="color: oklch(0.675 0.008 75);">0.185</span></div>
+        <div style="background: oklch(0.232 0.005 75); border: 1px solid oklch(1 0 0 / 0.07); border-top: 0; padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span>surface</span><span class="mono" style="color: oklch(0.675 0.008 75);">0.232</span></div>
+        <div style="background: oklch(0.272 0.006 75); border: 1px solid oklch(1 0 0 / 0.07); border-top: 0; padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span>surface-2</span><span class="mono" style="color: oklch(0.675 0.008 75);">0.272</span></div>
+        <div style="background: oklch(0.248 0.005 75); border: 1px solid oklch(0.68 0.17 25 / 0.5); border-top: 0; padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span style="color: oklch(0.68 0.17 25);">elevated ↓</span><span class="mono" style="color: oklch(0.68 0.17 25);">0.248</span></div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.5; color: oklch(0.675 0.008 75);">Приподнятый слой на 0.024 темнее слоя под ним.</div>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px;">
+      <div class="mono" style="font-size: 12px; color: oklch(0.72 0.15 150);">СТАЛО · монотонная лестница</div>
+      <div style="display: flex; flex-direction: column; gap: 0;">
+        <div style="background: oklch(0.185 0.004 75); border: 1px solid oklch(1 0 0 / 0.07); padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span>bg</span><span class="mono" style="color: oklch(0.675 0.008 75);">0.185</span></div>
+        <div style="background: oklch(0.222 0.005 75); border: 1px solid oklch(1 0 0 / 0.07); border-top: 0; padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span>surface</span><span class="mono" style="color: oklch(0.675 0.008 75);">0.222</span></div>
+        <div style="background: oklch(0.255 0.006 75); border: 1px solid oklch(1 0 0 / 0.07); border-top: 0; padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span>surface-2</span><span class="mono" style="color: oklch(0.675 0.008 75);">0.255</span></div>
+        <div style="background: oklch(0.292 0.006 75); border: 1px solid oklch(1 0 0 / 0.07); border-top: 0; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06); padding: 13px 16px; display: flex; justify-content: space-between; font-size: 13px;"><span style="color: oklch(0.72 0.15 150);">elevated ↑</span><span class="mono" style="color: oklch(0.72 0.15 150);">0.292</span></div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.5; color: oklch(0.675 0.008 75);">Каждый следующий слой светлее на 0.033–0.037 и несёт верхний блик.</div>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: oklch(1 0 0 / 0.07);"></div>
+
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="font-size: 17px; font-weight: 650;">Шкала высоты — четыре ступени вместо одной</div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="height: 92px; background: oklch(0.222 0.005 75); border-radius: 10.6px; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.04); display: flex; align-items: center; justify-content: center; font-size: 13px; color: oklch(0.675 0.008 75);">покой</div>
+        <div class="mono" style="font-size: 11px; line-height: 1.5; color: oklch(0.675 0.008 75);">--cc-elev-rest<br>inset 0 1px 0 /.04</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="height: 92px; background: oklch(0.255 0.006 75); border-radius: 10.6px; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.06), 0 2px 6px oklch(0 0 0 / 0.28); display: flex; align-items: center; justify-content: center; font-size: 13px; color: oklch(0.675 0.008 75);">наведение</div>
+        <div class="mono" style="font-size: 11px; line-height: 1.5; color: oklch(0.675 0.008 75);">--cc-elev-raised<br>0 2px 6px /.28</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="height: 92px; background: oklch(0.292 0.006 75); border-radius: 10.6px; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.07), 0 8px 24px oklch(0 0 0 / 0.36), 0 2px 6px oklch(0 0 0 / 0.22); display: flex; align-items: center; justify-content: center; font-size: 13px; color: oklch(0.675 0.008 75);">поповер</div>
+        <div class="mono" style="font-size: 11px; line-height: 1.5; color: oklch(0.675 0.008 75);">--cc-elev-overlay<br>0 8px 24px /.36</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="height: 92px; background: oklch(0.292 0.006 75); border-radius: 14px; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.08), 0 24px 64px -12px oklch(0 0 0 / 0.55), 0 4px 12px oklch(0 0 0 / 0.3); display: flex; align-items: center; justify-content: center; font-size: 13px; color: oklch(0.675 0.008 75);">шит</div>
+        <div class="mono" style="font-size: 11px; line-height: 1.5; color: oklch(0.675 0.008 75);">--cc-elev-modal<br>0 24px 64px -12px</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: oklch(1 0 0 / 0.07);"></div>
+
+  <div style="display: flex; gap: 28px; align-items: flex-start;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 15px; font-weight: 650;">Почему верхний блик обязателен</div>
+      <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">В тёмной теме тень уходит в фон: чёрное на почти-чёрном не создаёт края. Отделяет поверхность именно светлая линия сверху — как отражение источника света на фаске. Без неё карточка выглядит дырой, а не объектом.</div>
+    </div>
+    <div style="width: 380px; display: flex; gap: 14px;">
+      <div style="flex-grow: 1; height: 74px; background: oklch(0.292 0.006 75); border-radius: 10.6px; box-shadow: 0 8px 24px oklch(0 0 0 / 0.36); display: flex; align-items: flex-end; padding: 8px 10px; font-size: 11px; color: oklch(0.675 0.008 75);">только тень</div>
+      <div style="flex-grow: 1; height: 74px; background: oklch(0.292 0.006 75); border-radius: 10.6px; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.07), 0 8px 24px oklch(0 0 0 / 0.36); display: flex; align-items: flex-end; padding: 8px 10px; font-size: 11px; color: oklch(0.955 0.003 75);">тень + блик</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

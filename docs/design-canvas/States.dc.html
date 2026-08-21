@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+    a { color: oklch(0.672 0.131 38.8); } a:hover { color: oklch(0.770 0.101 43.6); }
+    .mono { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; }
+  </style>
+</helmet>
+<div style="width: 980px; background: oklch(0.185 0.004 75); color: oklch(0.955 0.003 75); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 32px;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div class="mono" style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.675 0.008 75);">Дизайн-система v2 · 02</div>
+    <div style="font-size: 27px; font-weight: 650; letter-spacing: -0.015em;">Состояния</div>
+    <div style="font-size: 15px; line-height: 1.55; color: oklch(0.675 0.008 75); max-width: 640px;">Весь интерактив держится на одном глобальном правиле <span class="mono" style="font-size: 13px; color: oklch(0.955 0.003 75);">button:hover { opacity: .85 }</span>. Оно гасит элемент целиком — текст, иконку, фон — вместо того чтобы отзываться. В коде 63 «active:opacity» против 12 «hover:bg». Отклик должен быть заливкой, а не прозрачностью.</div>
+  </div>
+
+  <div style="display: flex; gap: 40px;">
+    <div style="width: 300px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="mono" style="font-size: 12px; color: oklch(0.68 0.17 25);">БЫЛО</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="background: oklch(0.255 0.006 75); border-radius: 10.6px; padding: 11px 14px; font-size: 14px;">Покой</div>
+        <div style="background: oklch(0.255 0.006 75); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; opacity: 0.85;">Наведение — весь блок бледнеет</div>
+        <div style="background: oklch(0.255 0.006 75); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; opacity: 0.4;">Выключено — текст за границей читаемости</div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+      <div class="mono" style="font-size: 12px; color: oklch(0.72 0.15 150);">СТАЛО · каждый шаг — свой токен</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="background: oklch(0.255 0.006 75); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; display: flex; justify-content: space-between; align-items: center;"><span>Покой</span><span class="mono" style="font-size: 11px; color: oklch(0.675 0.008 75);">--cc-fill-control</span></div>
+        <div style="background: oklch(0.292 0.006 75); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05);"><span>Наведение — поверхность подсветилась</span><span class="mono" style="font-size: 11px; color: oklch(0.675 0.008 75);">--cc-fill-hover</span></div>
+        <div style="background: oklch(0.232 0.005 75); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; display: flex; justify-content: space-between; align-items: center;"><span>Нажатие — утопилась</span><span class="mono" style="font-size: 11px; color: oklch(0.675 0.008 75);">--cc-fill-press</span></div>
+        <div style="background: oklch(0.672 0.131 38.8 / 0.14); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; color: oklch(0.770 0.101 43.6);"><span>Выбрано</span><span class="mono" style="font-size: 11px; opacity: 0.75;">--cc-fill-selected</span></div>
+        <div style="background: oklch(0.212 0.004 75); border-radius: 10.6px; padding: 11px 14px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; color: oklch(0.52 0.006 75);"><span>Выключено — глушится фон, не текст</span><span class="mono" style="font-size: 11px;">--cc-fill-disabled</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: oklch(1 0 0 / 0.07);"></div>
+
+  <div style="display: flex; gap: 40px; align-items: flex-start;">
+    <div style="width: 420px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-size: 17px; font-weight: 650;">Фокус: кольцо в два слоя</div>
+      <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Сейчас кольцо всегда рисуется радиусом <span class="mono">radius-sm</span> — вокруг круглой кнопки оно квадратное. И у него один слой: на светлой поверхности акцент сливается с фоном.</div>
+      <div style="display: flex; gap: 18px; align-items: center; padding: 22px; background: oklch(0.222 0.005 75); border-radius: 10.6px;">
+        <div style="width: 42px; height: 42px; border-radius: 999px; background: oklch(0.255 0.006 75); outline: 2px solid oklch(0.672 0.131 38.8); outline-offset: 2px; border-radius: 6.4px;"></div>
+        <div style="font-size: 12px; color: oklch(0.68 0.17 25);">было: квадрат вокруг круга</div>
+      </div>
+      <div style="display: flex; gap: 18px; align-items: center; padding: 22px; background: oklch(0.222 0.005 75); border-radius: 10.6px;">
+        <div style="width: 42px; height: 42px; border-radius: 999px; background: oklch(0.255 0.006 75); box-shadow: 0 0 0 2px oklch(0.185 0.004 75), 0 0 0 4px oklch(0.672 0.131 38.8);"></div>
+        <div style="font-size: 12px; color: oklch(0.72 0.15 150);">стало: форма наследуется, контрастная прокладка</div>
+      </div>
+      <div class="mono" style="font-size: 11px; line-height: 1.6; color: oklch(0.675 0.008 75); background: oklch(0.159 0 0); padding: 12px 14px; border-radius: 6.4px;">:focus-visible {<br>&nbsp;&nbsp;outline: none;<br>&nbsp;&nbsp;box-shadow: 0 0 0 2px var(--app-bg),<br>&nbsp;&nbsp;&nbsp;&nbsp;0 0 0 4px var(--app-accent);<br>}</div>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-size: 17px; font-weight: 650;">Текст на акценте — свой токен</div>
+      <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Везде захардкожен <span class="mono">white</span>. В светлой теме акцент темнее и белый по нему держится, но токена нет — значит любая смена акцента ломает контраст молча.</div>
+      <div style="display: flex; gap: 12px;">
+        <div style="flex-grow: 1; background: oklch(0.672 0.131 38.8); color: oklch(0.16 0.02 40); border-radius: 10.6px; padding: 14px; font-size: 14px; font-weight: 600; text-align: center;">--cc-on-accent (тёмная)</div>
+        <div style="flex-grow: 1; background: oklch(0.520 0.132 38.5); color: oklch(0.99 0.004 90); border-radius: 10.6px; padding: 14px; font-size: 14px; font-weight: 600; text-align: center;">--cc-on-accent (светлая)</div>
+      </div>
+      <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75); margin-top: 6px;">В тёмной теме акцент светлый (L 0.672) — белый текст по нему даёт контраст около 2,4:1 и норму не проходит. Тёмный текст по светлому акценту — около 6:1. Это исправление читаемости, а не вкусовщина.</div>
+      <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 15px; font-weight: 650;">Загрузка</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="height: 13px; width: 180px; border-radius: 4px; background: linear-gradient(90deg, oklch(0.255 0.006 75) 0%, oklch(0.31 0.006 75) 50%, oklch(0.255 0.006 75) 100%);"></div>
+          <div style="height: 13px; width: 90px; border-radius: 4px; background: oklch(0.255 0.006 75);"></div>
+        </div>
+        <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Скелетона в системе нет ни одного: ленивые страницы открываются пустым экраном.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

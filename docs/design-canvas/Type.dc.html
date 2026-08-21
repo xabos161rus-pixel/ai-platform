@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+    a { color: oklch(0.672 0.131 38.8); } a:hover { color: oklch(0.770 0.101 43.6); }
+    .mono { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    .tnum { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+<div style="width: 980px; background: oklch(0.185 0.004 75); color: oklch(0.955 0.003 75); padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 30px;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div class="mono" style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.675 0.008 75);">Дизайн-система v2 · 04</div>
+    <div style="font-size: 27px; font-weight: 650; letter-spacing: -0.015em;">Типографика</div>
+    <div style="font-size: 15px; line-height: 1.55; color: oklch(0.675 0.008 75); max-width: 640px;">В системе три размера — 12, 13, 15. Всё, что крупнее, живёт мимо шкалы: шестьдесят вхождений text-sm/base/lg и заголовки ответа, заданные в другом месте. Корень 17px, поэтому rem здесь не равен привычным 16.</div>
+  </div>
+
+  <div style="display: flex; gap: 34px;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 0;">
+      <div style="display: flex; align-items: baseline; gap: 16px; padding: 13px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);">
+        <div class="mono" style="width: 130px; flex-shrink: 0; font-size: 11px; color: oklch(0.675 0.008 75);">display · 27px</div>
+        <div style="font-size: 27px; font-weight: 650; letter-spacing: -0.015em;">Заголовок страницы</div>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 16px; padding: 13px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);">
+        <div class="mono" style="width: 130px; flex-shrink: 0; font-size: 11px; color: oklch(0.675 0.008 75);">h1 · 21px</div>
+        <div style="font-size: 21px; font-weight: 650; letter-spacing: -0.012em;">Раздел ответа</div>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 16px; padding: 13px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);">
+        <div class="mono" style="width: 130px; flex-shrink: 0; font-size: 11px; color: oklch(0.675 0.008 75);">h2 · 19px</div>
+        <div style="font-size: 19px; font-weight: 650; letter-spacing: -0.01em;">Подраздел</div>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 16px; padding: 13px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);">
+        <div class="mono" style="width: 130px; flex-shrink: 0; font-size: 11px; color: oklch(0.675 0.008 75);">lg · 17px</div>
+        <div style="font-size: 17px; font-weight: 600;">Заголовок блока</div>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 16px; padding: 13px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);">
+        <div class="mono" style="width: 130px; flex-shrink: 0; font-size: 11px; color: oklch(0.770 0.101 43.6);">body · 15px</div>
+        <div style="font-size: 15px; line-height: 1.55;">Основной текст ответа и интерфейса</div>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 16px; padding: 13px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);">
+        <div class="mono" style="width: 130px; flex-shrink: 0; font-size: 11px; color: oklch(0.770 0.101 43.6);">meta · 13px</div>
+        <div style="font-size: 13px; color: oklch(0.675 0.008 75);">Подписи, модель, время</div>
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 16px; padding: 13px 0;">
+        <div class="mono" style="width: 130px; flex-shrink: 0; font-size: 11px; color: oklch(0.770 0.101 43.6);">caption · 12px</div>
+        <div style="font-size: 12px; color: oklch(0.675 0.008 75);">Служебные метки</div>
+      </div>
+    </div>
+
+    <div style="width: 360px; display: flex; flex-direction: column; gap: 20px;">
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 15px; font-weight: 650;">Цифры не должны прыгать</div>
+        <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Счётчик токенов обновляется на каждом нажатии клавиши. Пропорциональные цифры дёргают всю строку вправо-влево.</div>
+        <div style="background: oklch(0.222 0.005 75); border-radius: 10.6px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; justify-content: space-between; font-size: 13px;"><span style="color: oklch(0.675 0.008 75);">было</span><span class="mono">≈ 1 118 токенов · 4,10 ₽</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px;"><span style="color: oklch(0.675 0.008 75);">стало</span><span class="mono tnum">≈ 1 118 токенов · 4,10 ₽</span></div>
+          <div class="mono" style="font-size: 11px; color: oklch(0.72 0.15 150);">font-variant-numeric: tabular-nums</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 15px; font-weight: 650;">Моно — только машинный слой</div>
+        <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Переменная <span class="mono" style="font-size: 12px;">--font-mono</span> упоминается в стилях, но нигде не объявлена — стек прописан вторым экземпляром ниже. Один источник, одно объявление.</div>
+        <div class="mono" style="background: oklch(0.159 0 0); border-radius: 6.4px; padding: 12px 14px; font-size: 11px; line-height: 1.7; color: oklch(0.675 0.008 75);">--font-mono: ui-monospace,<br>&nbsp;&nbsp;'SF Mono', SFMono-Regular,<br>&nbsp;&nbsp;Menlo, monospace;</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height: 1px; background: oklch(1 0 0 / 0.07);"></div>
+
+  <div style="display: flex; gap: 34px; align-items: flex-start;">
+    <div style="width: 470px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 17px; font-weight: 650;">Ширина строки чтения</div>
+      <div style="font-size: 13px; line-height: 1.6; color: oklch(0.675 0.008 75);">Ответ модели сейчас растягивается на всю ширину окна — на широком мониторе это 150+ знаков в строке. Глаз теряет начало следующей строки. Комфортный предел — 70–80 знаков.</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+      <div style="background: oklch(0.222 0.005 75); border-radius: 10.6px; padding: 14px 16px;">
+        <div class="mono" style="font-size: 10px; color: oklch(0.68 0.17 25); margin-bottom: 6px;">БЫЛО · 150 знаков</div>
+        <div style="font-size: 11px; line-height: 1.5; color: oklch(0.675 0.008 75);">Ключи хранятся только на этом устройстве и уходят напрямую провайдеру, поэтому платформа не видит переписку и не может её потерять при отключении сервиса</div>
+      </div>
+      <div style="background: oklch(0.222 0.005 75); border-radius: 10.6px; padding: 14px 16px;">
+        <div class="mono" style="font-size: 10px; color: oklch(0.72 0.15 150); margin-bottom: 6px;">СТАЛО · 74 знака</div>
+        <div style="font-size: 11px; line-height: 1.5; color: oklch(0.675 0.008 75); max-width: 330px;">Ключи хранятся только на этом устройстве и уходят напрямую провайдеру, поэтому платформа не видит переписку и не может её потерять при отключении сервиса</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

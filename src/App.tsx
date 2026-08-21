@@ -1,5 +1,5 @@
 import { Component, Suspense, lazy, useEffect, type ReactNode } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/db';
 import { ToastProvider } from './components/ui/Toast';
@@ -28,6 +28,13 @@ function ThemeApplier() {
       document
         .querySelector('meta[name="theme-color"]')
         ?.setAttribute('content', light ? '#faf9f5' : '#1a1917');
+      // Зеркало для стартового скрипта в index.html: он ставит класс до
+      // первого кадра, пока Dexie ещё не ответила.
+      try {
+        localStorage.setItem('cc-theme', theme);
+      } catch {
+        /* приватный режим — просто останемся с вспышкой при загрузке */
+      }
     };
     apply();
     if (theme === 'system') {
@@ -91,7 +98,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
           <p className="text-sm text-muted">{t('app.errorHint')}</p>
           <button
             onClick={() => window.location.reload()}
-            className="rounded-[var(--cc-radius)] bg-accent px-5 py-3 font-medium text-white active:opacity-80"
+            className="rounded-[var(--cc-radius)] bg-accent px-5 py-3 font-medium text-[var(--cc-on-accent)] active:opacity-80"
           >
             {t('app.reload')}
           </button>
@@ -102,6 +109,17 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+/** Заглушка страницы на время загрузки её чанка: три полосы в ритме шапки. */
+function PageSkeleton() {
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
+      <div className="cc-skeleton h-7 w-40" />
+      <div className="cc-skeleton h-20 w-full" />
+      <div className="cc-skeleton h-20 w-full" />
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
@@ -110,14 +128,15 @@ export default function App() {
         <LangApplier />
         <SyncRunner />
         <ErrorBoundary>
-          {/* fallback={null}: переход в настройки — это клик по уже видимой
-              ссылке, лишний спиннер на долю секунды загрузки чанка был бы
-              просто миганием. */}
-          <Suspense fallback={null}>
+          {/* Скелетон вместо null: на медленной сети чанк настроек грузится
+              заметно, и пустой экран читался как поломка. */}
+          <Suspense fallback={<PageSkeleton />}>
             <Routes>
               <Route path="/" element={<ChatPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/stats" element={<StatsPage />} />
+              <Route path="/stats" element={<StatsPage />} />
+              {/* Неизвестный путь возвращаем в чат, а не на пустой лист. */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>

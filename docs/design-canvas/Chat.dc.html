@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+    a { color: oklch(0.672 0.131 38.8); } a:hover { color: oklch(0.770 0.101 43.6); }
+    .mono { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    .tnum { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+<div style="width: 1180px; height: 790px; background: oklch(0.185 0.004 75); color: oklch(0.955 0.003 75); display: flex; box-sizing: border-box; overflow: hidden;">
+
+  <div style="width: 264px; flex-shrink: 0; background: oklch(0.2 0.004 75); border-right: 1px solid oklch(1 0 0 / 0.07); display: flex; flex-direction: column;">
+    <div style="padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="flex-grow: 1; display: flex; align-items: center; gap: 8px; background: oklch(0.255 0.006 75); border-radius: 8px; padding: 8px 11px; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.955 0.003 75)" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+          <span style="font-size: 13px; font-weight: 550;">Новый чат</span>
+          <span class="mono" style="margin-left: auto; font-size: 10px; color: oklch(0.6 0.008 75);">⌘N</span>
+        </div>
+        <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h3.2l1.6 2H18a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"></path><path d="M12 11v5M9.5 13.5h5"></path></svg></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; background: oklch(0.222 0.005 75); border: 1px solid oklch(1 0 0 / 0.06); border-radius: 8px; padding: 7px 11px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.6 0.008 75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M16 16l4 4"></path></svg>
+        <span style="font-size: 13px; color: oklch(0.55 0.008 75);">Поиск</span>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; overflow: hidden; padding: 4px 8px; display: flex; flex-direction: column; gap: 2px;">
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: oklch(0.58 0.008 75); padding: 10px 6px 5px; display: flex; align-items: center; gap: 6px;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v10M8 7l4-3.5L16 7M7 20h10"></path></svg>Закреплённые
+      </div>
+      <div style="background: oklch(0.672 0.131 38.8 / 0.13); border-radius: 7px; padding: 8px 10px; font-size: 13px; display: flex; align-items: center; gap: 8px;"><span style="width: 3px; height: 15px; border-radius: 2px; background: oklch(0.672 0.131 38.8); flex-shrink: 0;"></span>Юнит-экономика РТЭ</div>
+      <div style="border-radius: 7px; padding: 8px 10px; font-size: 13px; color: oklch(0.8 0.006 75);">Разбор поставщика</div>
+
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: oklch(0.58 0.008 75); padding: 14px 6px 5px;">Сегодня</div>
+      <div style="border-radius: 7px; padding: 8px 10px; font-size: 13px; color: oklch(0.8 0.006 75);">Чем BYOK отличается от подписки</div>
+      <div style="border-radius: 7px; padding: 8px 10px; font-size: 13px; color: oklch(0.8 0.006 75);">Сравнение трёх подходов</div>
+      <div style="border-radius: 7px; padding: 8px 10px; font-size: 13px; color: oklch(0.8 0.006 75); display: flex; align-items: center; gap: 7px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="oklch(0.58 0.008 75)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h3.2l1.6 2H18a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"></path></svg>Работа</div>
+
+      <div class="mono" style="font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: oklch(0.58 0.008 75); padding: 14px 6px 5px;">Вчера</div>
+      <div style="border-radius: 7px; padding: 8px 10px; font-size: 13px; color: oklch(0.8 0.006 75);">План на неделю</div>
+    </div>
+
+    <div style="border-top: 1px solid oklch(1 0 0 / 0.07); padding: 8px; display: flex; flex-direction: column; gap: 2px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 7px;">
+        <div style="display: flex; align-items: center; gap: 9px; font-size: 13px; color: oklch(0.8 0.006 75);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V13M12 20V6M19 20v-9"></path></svg>Статистика</div>
+        <div class="mono tnum" style="font-size: 11px; color: oklch(0.6 0.008 75);">412 ₽ / 3000</div>
+      </div>
+      <div style="height: 3px; border-radius: 2px; background: oklch(0.255 0.006 75); margin: 0 10px 4px; overflow: hidden;"><div style="width: 13.7%; height: 100%; background: oklch(0.672 0.131 38.8); border-radius: 2px;"></div></div>
+      <div style="display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 7px; font-size: 13px; color: oklch(0.8 0.006 75);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M4 8h4M14 8h6M4 16h10M18 16h2"></path></svg>Настройки</div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; min-width: 0;">
+    <div style="height: 54px; flex-shrink: 0; border-bottom: 1px solid oklch(1 0 0 / 0.07); display: flex; align-items: center; padding: 0 20px; gap: 14px; background: oklch(0.19 0.004 75);">
+      <div style="min-width: 0; flex-grow: 1; display: flex; align-items: center; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Юнит-экономика РТЭ</div>
+        <div style="display: flex; align-items: center; gap: 6px; background: oklch(0.255 0.006 75); border-radius: 999px; padding: 5px 11px; flex-shrink: 0;">
+          <span style="width: 6px; height: 6px; border-radius: 999px; background: oklch(0.72 0.15 150);"></span>
+          <span style="font-size: 12px;">deepseek-reasoner</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px; background: oklch(0.672 0.131 38.8 / 0.14); border-radius: 999px; padding: 5px 10px; flex-shrink: 0;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="oklch(0.770 0.101 43.6)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"></path></svg>
+          <span style="font-size: 11px; color: oklch(0.770 0.101 43.6);">усилие: высокое</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 3px; flex-shrink: 0;">
+        <div style="width: 32px; height: 32px; border-radius: 7px; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"></rect><path d="M8 9h8M8 13h5"></path></svg></div>
+        <div style="width: 32px; height: 32px; border-radius: 7px; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19h14"></path></svg></div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; overflow: hidden; padding: 26px 0;">
+      <div style="max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; padding: 0 28px;">
+
+        <div style="display: flex; justify-content: flex-end;">
+          <div style="max-width: 78%; background: oklch(0.255 0.006 75); border-radius: 14px 14px 5px 14px; padding: 11px 15px; font-size: 15px; line-height: 1.5; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05);">Посчитай юнит-экономику плитника при закупе 14 200 и продаже 23 900</div>
+        </div>
+
+        <div style="display: flex; gap: 13px;">
+          <div style="width: 25px; height: 25px; border-radius: 7px; background: oklch(0.672 0.131 38.8 / 0.16); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="oklch(0.770 0.101 43.6)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"></path></svg>
+          </div>
+          <div style="min-width: 0; flex-grow: 1; display: flex; flex-direction: column; gap: 11px;">
+            <div style="display: inline-flex; align-items: center; gap: 7px; background: oklch(0.222 0.005 75); border-radius: 7px; padding: 6px 11px; align-self: flex-start; font-size: 12px; color: oklch(0.675 0.008 75);">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+              Рассуждение · 1 240 токенов · 8 с
+            </div>
+            <div style="font-size: 15px; line-height: 1.6;">При закупе 14 200 ₽ и цене 23 900 ₽ валовая маржа — <strong style="font-weight: 620;">9 700 ₽ на единицу, это 40,6 %</strong>. Ниже — как она тает по мере вычета реальных издержек.</div>
+            <div style="border: 1px solid oklch(1 0 0 / 0.07); border-radius: 10px; overflow: hidden;">
+              <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr; background: oklch(0.255 0.006 75); font-size: 12px; font-weight: 600; padding: 9px 14px; gap: 12px;"><span>Статья</span><span class="tnum" style="text-align: right;">₽</span><span class="tnum" style="text-align: right;">% от цены</span></div>
+              <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr; font-size: 13px; padding: 9px 14px; gap: 12px; border-top: 1px solid oklch(1 0 0 / 0.05);"><span style="color: oklch(0.8 0.006 75);">Закуп</span><span class="mono tnum" style="text-align: right;">14 200</span><span class="mono tnum" style="text-align: right; color: oklch(0.675 0.008 75);">59,4</span></div>
+              <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr; font-size: 13px; padding: 9px 14px; gap: 12px; border-top: 1px solid oklch(1 0 0 / 0.05);"><span style="color: oklch(0.8 0.006 75);">Доставка и переупаковка</span><span class="mono tnum" style="text-align: right;">1 150</span><span class="mono tnum" style="text-align: right; color: oklch(0.675 0.008 75);">4,8</span></div>
+              <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr; font-size: 13px; padding: 9px 14px; gap: 12px; border-top: 1px solid oklch(1 0 0 / 0.05);"><span style="color: oklch(0.8 0.006 75);">Продвижение</span><span class="mono tnum" style="text-align: right;">2 400</span><span class="mono tnum" style="text-align: right; color: oklch(0.675 0.008 75);">10,0</span></div>
+              <div style="display: grid; grid-template-columns: 1.6fr 1fr 1fr; font-size: 13px; padding: 10px 14px; gap: 12px; border-top: 1px solid oklch(1 0 0 / 0.09); background: oklch(0.213 0.005 75);"><span style="font-weight: 600;">Чистыми</span><span class="mono tnum" style="text-align: right; font-weight: 600; color: oklch(0.72 0.15 150);">6 150</span><span class="mono tnum" style="text-align: right; color: oklch(0.72 0.15 150);">25,7</span></div>
+            </div>
+            <div style="border-radius: 10px; overflow: hidden; border: 1px solid oklch(1 0 0 / 0.07);">
+              <div style="display: flex; align-items: center; justify-content: space-between; background: oklch(0.213 0.005 75); padding: 7px 13px; border-bottom: 1px solid oklch(1 0 0 / 0.07);">
+                <span class="mono" style="font-size: 11px; color: oklch(0.675 0.008 75);">python</span>
+                <div style="display: flex; gap: 4px; align-items: center;"><span class="mono" style="font-size: 11px; color: oklch(0.6 0.008 75);">копировать</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M15 5.5A2.5 2.5 0 0 0 12.5 4H6a2 2 0 0 0-2 2v7a2.5 2.5 0 0 0 1.5 2"></path></svg></div>
+              </div>
+              <div class="mono" style="background: oklch(0.159 0 0); padding: 12px 13px; font-size: 12px; line-height: 1.6;"><span style="color: oklch(0.62 0.02 75);"># порог безубыточности по количеству</span><br><span style="color: oklch(0.82 0.09 85);">fixed</span> = <span style="color: oklch(0.82 0.09 85);">38000</span><br><span style="color: oklch(0.82 0.09 85);">unit</span> = <span style="color: oklch(0.82 0.09 85);">6150</span><br><span style="color: oklch(0.672 0.131 38.8);">print</span>(<span style="color: oklch(0.82 0.09 85);">-(-fixed // unit)</span>)</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px; padding-top: 2px;">
+              <div style="width: 27px; height: 27px; border-radius: 7px; display: flex; align-items: center; justify-content: center; background: oklch(1 0 0 / 0.04);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M15 5.5A2.5 2.5 0 0 0 12.5 4H6a2 2 0 0 0-2 2v7a2.5 2.5 0 0 0 1.5 2"></path></svg></div>
+              <div style="width: 27px; height: 27px; border-radius: 7px; display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v5h5"></path><path d="M4.5 13a7.5 7.5 0 1 0 1.2-5.2L4 10"></path></svg></div>
+              <div style="width: 27px; height: 27px; border-radius: 7px; display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"></path></svg></div>
+              <span class="mono tnum" style="margin-left: 8px; font-size: 11px; color: oklch(0.58 0.008 75);">2 480 → 1 106 · мысли 1 240 · 3,84 ₽ · 11 с</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div style="flex-shrink: 0; padding: 0 28px 20px;">
+      <div style="max-width: 720px; margin: 0 auto;">
+        <div style="background: oklch(0.222 0.005 75); border: 1px solid oklch(1 0 0 / 0.09); border-radius: 17px; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 4px 16px oklch(0 0 0 / 0.22);">
+          <div style="padding: 14px 16px 4px; font-size: 15px; color: oklch(0.5 0.008 75);">Спросите что угодно…</div>
+          <div style="display: flex; align-items: center; gap: 3px; padding: 6px 9px 9px;">
+            <div style="width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11l-7.5 7.5a4 4 0 0 1-5.7-5.7l8-8a2.6 2.6 0 0 1 3.7 3.7l-8 8a1.3 1.3 0 0 1-1.8-1.8L15 8"></path></svg></div>
+            <div style="width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: oklch(0.672 0.131 38.8 / 0.16);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.770 0.101 43.6)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M3.5 12h17M12 3.5c2.2 2.4 3.3 5.4 3.3 8.5s-1.1 6.1-3.3 8.5c-2.2-2.4-3.3-5.4-3.3-8.5S9.8 5.9 12 3.5z"></path></svg></div>
+            <div style="width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="7" height="14" rx="1.6"></rect><rect x="13.5" y="5" width="7" height="14" rx="1.6"></rect></svg></div>
+            <div style="width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8.5" r="2.2"></circle><circle cx="16" cy="8.5" r="2.2"></circle><circle cx="12" cy="15.5" r="2.2"></circle></svg></div>
+            <div style="flex-grow: 1;"></div>
+            <span class="mono tnum" style="font-size: 11px; color: oklch(0.58 0.008 75); margin-right: 8px;">≈ 1 118 токенов · 4,10 ₽</span>
+            <div style="width: 34px; height: 34px; border-radius: 9px; background: oklch(0.672 0.131 38.8); display: flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.16);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.16 0.02 40)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

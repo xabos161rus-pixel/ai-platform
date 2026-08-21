@@ -31,6 +31,7 @@ export function ChatPage() {
     () => localStorage.getItem('ai-platform.sidebarCollapsed') === 'true',
   );
   const paneRef = useRef<ChatPaneHandle>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const creating = useRef(false);
 
   const settings = useLiveQuery(() => db.settings.get('app'), []);
@@ -111,8 +112,32 @@ export function ChatPage() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // Клавиатура на iOS ужимает visualViewport, но layout viewport остаётся
+  // прежним: каркас fixed inset-0 продолжает считать себя во весь экран.
+  // Отдаём каркасу фактическую высоту видимой области — тогда ужимается и
+  // лента, и композер поднимается сам, без transform поверх ленты.
+  // Пишем в DOM напрямую: события сыплются на каждый кадр появления
+  // клавиатуры, ререндер React на каждом был бы рваным.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const frame = frameRef.current;
+    if (!vv || !frame) return;
+    const apply = () => {
+      const hidden = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      frame.style.bottom = hidden ? `${hidden}px` : '';
+    };
+    vv.addEventListener('resize', apply);
+    vv.addEventListener('scroll', apply);
+    apply();
+    return () => {
+      vv.removeEventListener('resize', apply);
+      vv.removeEventListener('scroll', apply);
+      frame.style.bottom = '';
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 flex bg-bg">
+    <div ref={frameRef} className="fixed inset-0 flex bg-bg">
       {/* Аврора: fixed-слой позади всего контента, вне потока — скролл ленты
           его не задевает. Позиционированные (fixed) потомки красятся ПОСЛЕ
           обычных статичных — без z-index на контент-обёртке ниже аврора легла

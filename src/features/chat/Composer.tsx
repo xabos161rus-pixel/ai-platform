@@ -77,27 +77,25 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   const menuRef = useRef<SnippetMenuHandle>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // iOS-клавиатура: visualViewport ужимается высотой при появлении клавиатуры,
-  // но layout viewport — нет, поэтому композер (позиционированный обычным
-  // потоком у низа fixed-каркаса) остаётся под клавиатурой без этого сдвига.
-  // Пишем transform напрямую в DOM, а не через setState — событие resize/scroll
-  // visualViewport сыплется на каждый кадр появления клавиатуры, и вызывать
-  // ререндер React на каждый из них было бы дорого и рвано (не 60fps).
+  // Клавиатуру теперь отрабатывает каркас страницы (ChatPage ужимает свою
+  // высоту по visualViewport) — композер поднимается вместе с ним. Здесь
+  // осталось одно: сообщить наружу фактическую высоту блока, чтобы тост
+  // вставал НАД композером, а не под ним и не по зашитой константе.
   useEffect(() => {
-    const vv = window.visualViewport;
     const wrapper = wrapperRef.current;
-    if (!vv || !wrapper) return;
-    const onViewportChange = () => {
-      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      wrapper.style.transform = offset ? `translateY(-${offset}px)` : '';
+    if (!wrapper) return;
+    const publish = () => {
+      document.documentElement.style.setProperty(
+        '--cc-composer-h',
+        `${Math.round(wrapper.getBoundingClientRect().height)}px`,
+      );
     };
-    vv.addEventListener('resize', onViewportChange);
-    vv.addEventListener('scroll', onViewportChange);
-    onViewportChange();
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(wrapper);
     return () => {
-      vv.removeEventListener('resize', onViewportChange);
-      vv.removeEventListener('scroll', onViewportChange);
-      wrapper.style.transform = '';
+      ro.disconnect();
+      document.documentElement.style.removeProperty('--cc-composer-h');
     };
   }, []);
 

@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif; }
+    a { color: oklch(0.672 0.131 38.8); } a:hover { color: oklch(0.770 0.101 43.6); }
+    .mono { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace; }
+    .tnum { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+<div style="width: 860px; background: oklch(0.185 0.004 75); color: oklch(0.955 0.003 75); padding: 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div class="mono" style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.675 0.008 75);">Дизайн-система v2 · 10</div>
+    <div style="font-size: 27px; font-weight: 650; letter-spacing: -0.015em;">Телефон</div>
+    <div style="font-size: 15px; line-height: 1.55; color: oklch(0.675 0.008 75); max-width: 640px;">Главная поломка не в отступах. Композер уезжает вверх вместе с клавиатурой, а лента остаётся прежней высоты — и последнее сообщение целиком уходит под клавиатуру ровно в тот момент, когда человек печатает ответ на него.</div>
+  </div>
+
+  <div style="display: flex; gap: 26px; align-items: flex-start;">
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div class="mono" style="font-size: 11px; color: oklch(0.68 0.17 25);">БЫЛО</div>
+      <div style="width: 250px; height: 490px; border-radius: 22px; border: 1px solid oklch(1 0 0 / 0.12); overflow: hidden; position: relative; background: oklch(0.185 0.004 75);">
+        <div style="height: 46px; border-bottom: 1px solid oklch(1 0 0 / 0.07); display: flex; align-items: center; padding: 0 12px; gap: 9px; font-size: 12px; font-weight: 600;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.9" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="14" rx="2"></rect><path d="M9.5 5v14"></path></svg>
+          Юнит-экономика
+        </div>
+        <div style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="align-self: flex-end; background: oklch(0.255 0.006 75); border-radius: 11px; padding: 8px 11px; font-size: 11px; max-width: 80%;">Посчитай маржу при закупе 14 200</div>
+          <div style="font-size: 11px; line-height: 1.5; color: oklch(0.8 0.006 75);">Валовая маржа 9 700 ₽ на единицу, это 40,6 %. Ниже — как она тает по мере вычета издержек…</div>
+        </div>
+        <div style="position: absolute; left: 0; right: 0; bottom: 176px; padding: 8px 12px;">
+          <div style="background: oklch(0.222 0.005 75); border: 1px solid oklch(0.672 0.131 38.8); border-radius: 14px; padding: 10px 12px; font-size: 11px; color: oklch(0.55 0.008 75);">Понял, а если…<span style="color: oklch(0.672 0.131 38.8);">|</span></div>
+        </div>
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 176px; background: oklch(0.26 0.004 75); border-top: 1px solid oklch(1 0 0 / 0.1); display: flex; align-items: center; justify-content: center; font-size: 11px; color: oklch(0.5 0.008 75);">клавиатура</div>
+        <div style="position: absolute; left: 12px; right: 12px; top: 118px; bottom: 176px; border: 1.5px dashed oklch(0.68 0.17 25 / 0.75); border-radius: 8px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px;"><span style="font-size: 10px; color: oklch(0.78 0.15 25); background: oklch(0.185 0.004 75); padding: 2px 6px; border-radius: 4px;">лента не ужалась</span></div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div class="mono" style="font-size: 11px; color: oklch(0.72 0.15 150);">СТАЛО</div>
+      <div style="width: 250px; height: 490px; border-radius: 22px; border: 1px solid oklch(1 0 0 / 0.12); overflow: hidden; position: relative; background: oklch(0.185 0.004 75);">
+        <div style="height: 46px; border-bottom: 1px solid oklch(1 0 0 / 0.07); display: flex; align-items: center; padding: 0 12px; gap: 9px; font-size: 12px; font-weight: 600;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.675 0.008 75)" stroke-width="1.9" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="14" rx="2"></rect><path d="M9.5 5v14"></path></svg>
+          Юнит-экономика
+        </div>
+        <div style="padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="align-self: flex-end; background: oklch(0.255 0.006 75); border-radius: 11px; padding: 8px 11px; font-size: 11px; max-width: 80%;">Посчитай маржу при закупе 14 200</div>
+          <div style="font-size: 11px; line-height: 1.5; color: oklch(0.8 0.006 75);">Валовая маржа 9 700 ₽ на единицу, это 40,6 %.</div>
+          <div style="background: oklch(0.213 0.005 75); border-radius: 9px; padding: 8px 10px; font-size: 10px; display: flex; justify-content: space-between;"><span style="color: oklch(0.8 0.006 75);">Чистыми</span><span class="mono tnum" style="color: oklch(0.72 0.15 150);">6 150 ₽ · 25,7 %</span></div>
+        </div>
+        <div style="position: absolute; left: 0; right: 0; bottom: 176px; padding: 8px 12px;">
+          <div style="background: oklch(0.222 0.005 75); border: 1px solid oklch(0.672 0.131 38.8); border-radius: 14px; padding: 10px 12px; font-size: 11px; color: oklch(0.55 0.008 75); box-shadow: 0 0 0 3px oklch(0.672 0.131 38.8 / 0.13);">Понял, а если…<span style="color: oklch(0.672 0.131 38.8);">|</span></div>
+        </div>
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 176px; background: oklch(0.26 0.004 75); border-top: 1px solid oklch(1 0 0 / 0.1); display: flex; align-items: center; justify-content: center; font-size: 11px; color: oklch(0.5 0.008 75);">клавиатура</div>
+        <div style="position: absolute; left: 12px; right: 12px; top: 52px; bottom: 232px; border: 1.5px dashed oklch(0.72 0.15 150 / 0.75); border-radius: 8px;"></div>
+        <div style="position: absolute; left: 50%; transform: translateX(-50%); bottom: 240px;"><span style="font-size: 10px; color: oklch(0.72 0.15 150); background: oklch(0.185 0.004 75); padding: 2px 6px; border-radius: 4px;">лента = видимая часть</span></div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-size: 16px; font-weight: 650;">Список правок</div>
+      <div style="display: flex; flex-direction: column; gap: 0; font-size: 13px;">
+        <div style="display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">1</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">Каркас получает высоту видимой области, а не окна — лента ужимается вместе с клавиатурой</span></div>
+        <div style="display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">2</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">Автоскролл срабатывает и на открытие клавиатуры</span></div>
+        <div style="display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">3</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">Кнопки под сообщением — 21 px, надо 44: сейчас в них не попасть пальцем</span></div>
+        <div style="display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">4</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">Меню чата и выбор модели выезжают за правый край — на телефоне это нижний шит</span></div>
+        <div style="display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">5</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">Низ сайдбара под индикатором home — нет нижней безопасной зоны</span></div>
+        <div style="display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">6</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">Тост при открытой клавиатуре оказывается под ней</span></div>
+        <div style="display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px solid oklch(1 0 0 / 0.07);"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">7</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">В светлой теме статус-бар остаётся чёрной полосой</span></div>
+        <div style="display: flex; gap: 11px; padding: 10px 0;"><span class="mono" style="color: oklch(0.770 0.101 43.6); flex-shrink: 0;">8</span><span style="color: oklch(0.8 0.006 75); line-height: 1.45;">Двойной тап по кнопке зумит страницу — нет touch-action</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
