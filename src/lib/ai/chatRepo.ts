@@ -337,11 +337,20 @@ export function toContext(messages: Message[], historyLimit: number, activeLeafI
   const tail = historyLimit > 0 ? usable.slice(-historyLimit) : usable;
   return tail.map((m) => {
     const blocks = m.files?.length && m.fileTexts
-      ? m.files.map((f, i) => `<file name="${f.name}">\n${m.fileTexts?.[i] ?? ''}\n</file>`).join('\n\n')
+      ? m.files
+          // Кавычка или угловая скобка в имени файла ломала разметку блока —
+          // модель видела оборванный тег вместо содержимого.
+          .map((f, i) => `<file name="${escapeAttr(f.name)}">\n${m.fileTexts?.[i] ?? ''}\n</file>`)
+          .join('\n\n')
       : '';
     const content = blocks ? (m.content.trim() ? `${m.content}\n\n${blocks}` : blocks) : m.content;
     return { role: m.role, content, images: m.images };
   });
+}
+
+/** Экранирование значения атрибута в псевдо-XML файловых блоков. */
+function escapeAttr(v: string): string {
+  return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /** Список уникальных папок среди живых чатов — папка без единого чата исчезает сама. */

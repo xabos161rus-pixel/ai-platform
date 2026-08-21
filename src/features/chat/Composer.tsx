@@ -14,6 +14,7 @@ import {
   isTextFile,
   isXlsxFile,
   MAX_MSG_FILE_CHARS,
+  fitFileText,
   type AttachedFile,
 } from '../../lib/files';
 import { useT } from '../../lib/i18n';
@@ -156,21 +157,37 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
         else if (isXlsxFile(f)) attached = await extractXlsx(f);
         else attached = await extractText(f);
       } catch (e) {
-        if (e instanceof Error && e.message === 'too_big') toast(t('files.tooBig'));
-        else if (e instanceof Error && e.message === 'office_too_big') toast(t('files.officeTooBig'));
-        else toast(t('files.readFailed'));
+        const code = e instanceof Error ? e.message : '';
+        if (code === 'too_big') toast(t('files.tooBig'), 'error');
+        else if (code === 'office_too_big') toast(t('files.officeTooBig'), 'error');
+        else if (code === 'pdf_too_big') toast(t('files.pdfTooBig'), 'error');
+        else toast(t('files.readFailed'), 'error');
         continue;
+      }
+      // Скан без текстового слоя приходит страницами-картинками: их читает
+      // vision-модель, локального OCR в проекте намеренно нет.
+      if (attached.images?.length) {
+        const room = MAX_IMAGES - images.length;
+        if (room <= 0) {
+          toast(t('composer.tooManyImages'), 'error');
+          continue;
+        }
+        const pages = attached.images.slice(0, room);
+        setImages((prev) => [...prev, ...pages].slice(0, MAX_IMAGES));
+        toast(t('files.scanned', { name: attached.name, n: pages.length }));
       }
       setFiles((prev) => {
         const used = prev.reduce((n, x) => n + x.text.length, 0);
         const room = MAX_MSG_FILE_CHARS - used;
         if (room <= 0) {
-          toast(t('files.limitReached'));
+          toast(t('files.limitReached'), 'error');
           return prev;
         }
         if (attached.text.length > room) {
           toast(t('files.trimmed', { name: attached.name }));
-          return [...prev, { ...attached, text: attached.text.slice(0, room) }];
+          // Умная подгонка вместо slice: режем по границе абзаца, оставляем
+          // и хвост документа, про пропуск пишем прямо в тексте.
+          return [...prev, { ...attached, text: fitFileText(attached.text, room) }];
         }
         return [...prev, attached];
       });
