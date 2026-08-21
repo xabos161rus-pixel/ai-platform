@@ -295,6 +295,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             model: useModel,
             signal: ac.signal,
             temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+            reasoningEffort: chat.reasoningEffort ?? undefined,
             maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
             onDelta,
             onReasoning,
@@ -319,6 +320,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             jinaKey,
             signal: ac.signal,
             temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+            reasoningEffort: chat.reasoningEffort ?? undefined,
             maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
             onDelta,
             onReasoning,
@@ -407,6 +409,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
                 model: pick.model,
                 signal: ac.signal,
                 temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+                reasoningEffort: chat.reasoningEffort ?? undefined,
                 maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
                 onDelta: (piece) => {
                   partial += piece;
@@ -470,6 +473,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
           question: opts.question,
           signal: ac.signal,
           temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
+          reasoningEffort: chat.reasoningEffort ?? undefined,
           maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
           cb: {
             onStage: (st) => setCouncilStage(st),
@@ -701,7 +705,10 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             onClick={() => setPromptOpen(true)}
             disabled={!chat}
             className={`grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors active:opacity-60 ${
-              chat?.systemPrompt || chat?.temperature != null || chat?.maxTokens != null
+              chat?.systemPrompt ||
+              chat?.temperature != null ||
+              chat?.maxTokens != null ||
+              chat?.reasoningEffort != null
                 ? 'text-accent'
                 : 'text-muted hover:text-text'
             }`}

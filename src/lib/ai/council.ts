@@ -135,10 +135,11 @@ export async function runCouncil(params: {
   question: string;
   signal: AbortSignal;
   temperature?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
   maxTokens?: number;
   cb?: CouncilCallbacks;
 }): Promise<CouncilResult> {
-  const { picks, chairman, history, systemPrompt, question, signal, temperature, maxTokens, cb } = params;
+  const { picks, chairman, history, systemPrompt, question, signal, temperature, maxTokens, reasoningEffort, cb } = params;
   const ask = (pick: CouncilPick, messages: ChatMessage[], onDelta?: (s: string) => void) =>
     streamChat({
       provider: pick.provider,
@@ -147,6 +148,7 @@ export async function runCouncil(params: {
       model: pick.model,
       signal,
       temperature,
+      reasoningEffort,
       maxTokens,
       onDelta: onDelta ?? (() => {}),
       // Промежуточные стадии никто не читает по мере печати — демо отвечает

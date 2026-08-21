@@ -14,11 +14,15 @@ interface Props {
   onSave: (p: Omit<Provider, keyof BaseEntity>, id?: string) => void | Promise<void>;
 }
 
-/** Готовые адреса известных агрегаторов — чтобы не искать их в документации. */
-const PRESETS = [
+/** Готовые адреса известных агрегаторов — чтобы не искать их в документации.
+ *  models заполняются только там, где список короткий и стабильный: у
+ *  агрегаторов он на сотни позиций и приезжает кнопкой «Подтянуть список».
+ *  Цены не проставляем нигде — тарифы меняются, врать в счётчике нельзя. */
+const PRESETS: { name: string; baseUrl: string; models?: string[] }[] = [
   { name: 'Polza.ai', baseUrl: 'https://api.polza.ai/api/v1' },
   { name: 'VseGPT', baseUrl: 'https://api.vsegpt.ru/v1' },
   { name: 'BotHub', baseUrl: 'https://bothub.chat/api/v2/openai/v1' },
+  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat', 'deepseek-reasoner'] },
   { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
 ];
 
@@ -132,10 +136,19 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
             {PRESETS.map((p) => (
               <button
                 key={p.name}
-                className="rounded-full bg-surface-2 px-3 py-1.5 text-sm active:opacity-70"
+                className="cc-hit rounded-full bg-surface-2 px-3 py-1.5 text-sm"
                 onClick={() => {
                   setName(p.name);
                   setBaseUrl(p.baseUrl);
+                  // Модели пресета подставляем только в пустую форму, чтобы
+                  // не затереть уже введённые вручную строки с ценами.
+                  if (p.models) {
+                    setRows((rs) =>
+                      rs.some((r) => r.id.trim())
+                        ? rs
+                        : p.models!.map((id) => ({ id, priceIn: '', priceOut: '' })),
+                    );
+                  }
                 }}
               >
                 {p.name}

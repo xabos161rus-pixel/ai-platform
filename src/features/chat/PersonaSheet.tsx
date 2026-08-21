@@ -8,6 +8,7 @@ import type { Chat, Persona } from '../../db/types';
 import { createPersona, listPersonas, removePersona } from '../../lib/ai/personaRepo';
 import { patchChat } from '../../lib/ai/chatRepo';
 import { useT } from '../../lib/i18n';
+import { isReasoningModel } from '../../lib/ai/models';
 
 interface Props {
   open: boolean;
@@ -27,6 +28,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
   const [roleName, setRoleName] = useState<string | null>(chat?.personaName ?? null);
   const [temperature, setTemperature] = useState<number | null>(chat?.temperature ?? null);
   const [maxTokens, setMaxTokens] = useState<number | null>(chat?.maxTokens ?? null);
+  const [effort, setEffort] = useState<'low' | 'medium' | 'high' | null>(chat?.reasoningEffort ?? null);
   const personas = useLiveQuery(() => listPersonas(), [], [] as Persona[]);
 
   if (!open || !chat) return null;
@@ -54,6 +56,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
       // и запрос корректно перестаёт слать параметр после сброса.
       temperature,
       maxTokens,
+      reasoningEffort: effort,
     });
     toast(t('persona.promptUpdated'));
     onClose();
@@ -170,6 +173,39 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
               {t('params.maxTokensHint')}
             </span>
           </label>
+
+          {/* Глубина рассуждения. «Не задано» — отдельное значение, а не ноль:
+              модели без поддержки на неизвестное поле в теле отвечают 400,
+              поэтому по умолчанию параметр не уходит вовсе. */}
+          <div>
+            <span className="mb-1 block text-sm font-medium">{t('params.effort')}</span>
+            <div className="flex gap-1 rounded-[var(--cc-radius)] bg-surface-2 p-1">
+              {([null, 'low', 'medium', 'high'] as const).map((v) => (
+                <button
+                  key={v ?? 'off'}
+                  onClick={() => setEffort(v)}
+                  className={`flex-1 rounded-[var(--cc-radius-sm)] px-2 py-2 text-[length:var(--cc-text-meta)] transition-colors duration-[var(--cc-dur-fast)] ${
+                    effort === v
+                      ? 'bg-accent font-medium text-[var(--cc-on-accent)]'
+                      : 'cc-hit text-muted'
+                  }`}
+                >
+                  {t(
+                    v === null
+                      ? 'params.effortOff'
+                      : v === 'low'
+                        ? 'params.effortLow'
+                        : v === 'medium'
+                          ? 'params.effortMedium'
+                          : 'params.effortHigh',
+                  )}
+                </button>
+              ))}
+            </div>
+            <span className="mt-1 block text-[length:var(--cc-text-caption)] leading-relaxed text-muted">
+              {isReasoningModel(chat.model) ? t('params.effortHint') : t('params.effortHintPlain')}
+            </span>
+          </div>
         </div>
 
         {text.trim() && (

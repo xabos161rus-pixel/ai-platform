@@ -31,6 +31,13 @@ export interface Chat extends BaseEntity {
   maxTokens?: number | null;
   /** Режим инструментов агентского цикла. Отсутствие/null — как 'off' (без tools). */
   toolMode?: 'off' | 'tools' | 'research' | null;
+  /**
+   * Глубина рассуждения думающих моделей (reasoning_effort в OpenAI-формате).
+   * null/отсутствие — параметр вообще не уходит провайдеру: у моделей без
+   * поддержки неизвестное поле в теле даёт 400, поэтому шлём только явно
+   * заданное значение.
+   */
+  reasoningEffort?: 'low' | 'medium' | 'high' | null;
 }
 
 export type Role = 'user' | 'assistant';

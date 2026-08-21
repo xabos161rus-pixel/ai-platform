@@ -108,6 +108,16 @@ export function formatCost(rub: number | null): string {
 }
 
 /** Грубая пред-оценка входа. Только для подписи «≈», см. комментарий выше. */
+/**
+ * Догадка «модель умеет думать» — по идентификатору. Явного признака в данных
+ * нет: провайдеры отдают в /models только id, а reasoning виден постфактум,
+ * когда в потоке пришло reasoning_content. Используется ТОЛЬКО для подсказки
+ * в интерфейсе; на отправку параметра не влияет — его решает пользователь.
+ */
+export function isReasoningModel(id: string): boolean {
+  return /reason|thinking|deepseek-r\d|(^|[-/])o[134](-|$)|qwq|magistral/i.test(id);
+}
+
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);
 }

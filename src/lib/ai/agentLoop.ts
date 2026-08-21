@@ -37,6 +37,7 @@ export interface RunAgentParams {
   jinaKey?: string;
   signal?: AbortSignal;
   temperature?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
   maxTokens?: number;
   onDelta: OnDelta;
   onReasoning?: OnDelta;
@@ -173,6 +174,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
     jinaKey,
     signal,
     temperature,
+    reasoningEffort,
     maxTokens,
     onDelta,
     onReasoning,
@@ -187,7 +189,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
     if (last && /найди|поиск|search/i.test(last.content)) {
       return runDemoAgent(last.content, model, onDelta, onStep, signal);
     }
-    const reply = await streamChat({ provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens });
+    const reply = await streamChat({ provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, reasoningEffort });
     return { ...reply, toolTrace: [] };
   }
 
@@ -224,6 +226,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
         wireTail,
         signal,
         temperature,
+        reasoningEffort,
         maxTokens,
         onDelta: wrapped,
         onReasoning,
@@ -241,6 +244,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
           wireTail,
           signal,
           temperature,
+          reasoningEffort,
           maxTokens,
           onDelta: wrapped,
           onReasoning,

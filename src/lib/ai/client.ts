@@ -420,6 +420,8 @@ export async function streamChat(params: {
   signal?: AbortSignal;
   temperature?: number;
   maxTokens?: number;
+  /** Глубина рассуждения думающих моделей. undefined — поле не уходит в тело. */
+  reasoningEffort?: 'low' | 'medium' | 'high';
   /** Описания инструментов в wire-формате. Демо-путь их игнорирует — демо-цикл живёт в agentLoop. */
   tools?: WireTool[];
   /** Готовые wire-сообщения агентского цикла (ответы assistant с tool_calls + role:'tool'), добавляются после toWire(messages) как есть. */
@@ -427,7 +429,7 @@ export async function streamChat(params: {
   /** Демо без задержки стрима — для стадий, которые не смотрят в реальном времени (консилиум). Живых провайдеров не касается. */
   demoInstant?: boolean;
 }): Promise<Reply> {
-  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, tools, wireTail, demoInstant } = params;
+  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, reasoningEffort, tools, wireTail, demoInstant } = params;
   if (!provider) throw new AiError('no_provider', t('error.noProviderInternal'));
   // Демо-путь параметры игнорирует — заглушка не читает temperature/maxTokens/tools.
   if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal, onReasoning, demoInstant);
@@ -450,6 +452,7 @@ export async function streamChat(params: {
         stream_options: { include_usage: true },
         ...(typeof temperature === 'number' && { temperature }),
         ...(typeof maxTokens === 'number' && { max_tokens: maxTokens }),
+        ...(reasoningEffort && { reasoning_effort: reasoningEffort }),
         ...(tools?.length && { tools }),
       }),
       signal,
