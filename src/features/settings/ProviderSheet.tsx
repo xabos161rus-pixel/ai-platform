@@ -179,7 +179,7 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
             <button
               disabled={!baseUrl.trim() || fetching}
               onClick={() => void handleFetchModels()}
-              className="flex items-center gap-1.5 rounded-[var(--cc-radius-sm)] px-2 py-1 text-[length:var(--cc-text-meta)] font-medium text-accent transition-colors hover:bg-[var(--cc-fill-ghost-hover)] active:opacity-60 disabled:opacity-30"
+              className="cc-hit flex items-center gap-1.5 rounded-[var(--cc-radius-sm)] px-2 py-1 text-[length:var(--cc-text-meta)] font-medium text-accent disabled:opacity-30"
             >
               <Download size={13} className={fetching ? 'animate-pulse' : ''} />
               {fetching ? t('provider.fetching') : t('provider.fetchModels')}
@@ -216,7 +216,7 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
                   aria-label={t('provider.removeModelAria')}
                   disabled={rows.length === 1}
                   onClick={() => removeRow(i)}
-                  className="grid size-8 place-items-center text-muted active:opacity-60 disabled:opacity-25"
+                  className="cc-hit grid size-8 place-items-center rounded-[var(--cc-radius-sm)] text-muted disabled:opacity-25"
                 >
                   <X size={15} />
                 </button>
@@ -224,7 +224,7 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
             ))}
           </div>
           <button
-            className="mt-2 text-sm text-accent active:opacity-60"
+            className="cc-hit mt-2 rounded-[var(--cc-radius-sm)] text-sm text-accent"
             onClick={() => setRows((rs) => [...rs, { id: '', priceIn: '', priceOut: '' }])}
           >
             + {t('provider.addModel')}

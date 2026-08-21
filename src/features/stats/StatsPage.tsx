@@ -67,9 +67,14 @@ export function StatsPage() {
                   { label: t('stats.total'), rub: totals.rub, sub: t('stats.tokens', { n: formatTokens(totals.tokens) }) },
                 ] as const
               ).map((card) => (
-                <div key={card.label} className="rounded-[var(--cc-radius)] border border-hairline px-3.5 py-3">
+                <div
+                  key={card.label}
+                  className="rounded-[var(--cc-radius-lg)] border border-hairline bg-surface px-3.5 py-3 shadow-[var(--cc-elev-rest)]"
+                >
                   <p className="text-[length:var(--cc-text-caption)] font-medium text-muted">{card.label}</p>
-                  <p className="mt-1 font-mono text-lg tabular-nums">{card.rub > 0 ? formatCost(card.rub) : '0 ₽'}</p>
+                  <p className="mt-1 font-mono text-[length:var(--cc-text-h1)] tabular-nums">
+                    {card.rub > 0 ? formatCost(card.rub) : '0 ₽'}
+                  </p>
                   <p className="font-mono text-[length:var(--cc-text-caption)] text-muted tabular-nums">{card.sub}</p>
                 </div>
               ))}
@@ -114,8 +119,15 @@ export function StatsPage() {
                 const max = Math.max(1, ...byDay.map((d) => d.rub));
                 const maxTokens = Math.max(1, ...byDay.map((d) => d.tokens));
                 const useTokens = byDay.every((d) => d.rub === 0);
+                const peak = useTokens ? formatTokens(maxTokens) : formatCost(max);
                 return (
-                  <div className="flex h-16 items-end gap-[2px]">
+                  <>
+                    <div className="mb-1 flex items-baseline justify-between font-mono text-[length:var(--cc-text-caption)] text-muted tabular-nums">
+                      <span>{byDay[0]?.day.slice(5)}</span>
+                      <span>{t('stats.peak', { v: peak })}</span>
+                      <span>{byDay[byDay.length - 1]?.day.slice(5)}</span>
+                    </div>
+                    <div className="flex h-16 items-end gap-[2px]">
                     {byDay.map((d) => {
                       const v = useTokens ? d.tokens / maxTokens : d.rub / max;
                       const has = useTokens ? d.tokens > 0 : d.rub > 0;
@@ -128,7 +140,8 @@ export function StatsPage() {
                         />
                       );
                     })}
-                  </div>
+                    </div>
+                  </>
                 );
               })()}
             </Section>

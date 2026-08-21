@@ -236,10 +236,6 @@ select {
 /* Интерактивная зона с честным откликом: наведение подсвечивает поверхность,
    нажатие утапливает. Заменяет глобальное гашение прозрачности там, где
    размечено. */
-.cc-hit {
-  transition: background-color var(--cc-dur-fast) var(--cc-ease-out),
-    color var(--cc-dur-fast) var(--cc-ease-out);
-}
 @media (hover: hover) and (pointer: fine) {
   .cc-hit:hover:not(:disabled) {
     background-color: var(--cc-fill-hover);

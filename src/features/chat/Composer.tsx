@@ -259,7 +259,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
               <img src={src} alt={t('chat.attachmentAlt')} className="size-14 rounded-[var(--cc-radius-sm)] border border-hairline object-cover" />
               <button
                 aria-label={t('composer.removeImageAria')}
-                className="cc-tap-halo absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-hairline bg-surface-2 text-muted active:opacity-60"
+                className="cc-tap-halo absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-hairline bg-surface-2 text-muted transition-colors duration-[var(--cc-dur-fast)] hover:bg-elevated"
                 onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
               >
                 <X size={11} />
@@ -276,7 +276,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
               <span className="shrink-0 text-muted">{t('files.kb', { n: Math.max(1, Math.round(f.size / 1024)) })}</span>
               <button
                 aria-label={t('files.removeAria')}
-                className="shrink-0 text-muted active:opacity-60"
+                className="cc-hit shrink-0 rounded-[var(--cc-radius-sm)] text-muted"
                 onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
               >
                 <X size={11} />
@@ -375,7 +375,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             aria-label={t('chat.attachFile')}
             disabled={busy}
             onClick={() => fileRef.current?.click()}
-            className="cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
+            className="cc-hit cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text disabled:opacity-25"
           >
             <Paperclip size={18} />
           </button>
@@ -384,12 +384,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             title={t(`agent.mode.${toolMode}`)}
             onClick={() => onToolMode(NEXT_TOOL_MODE[toolMode])}
             className={
-              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 ' +
+              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors ' +
               (toolMode === 'research'
                 ? 'bg-accent/15 text-accent'
                 : toolMode === 'tools'
-                  ? 'text-accent'
-                  : 'text-muted hover:text-text')
+                  ? 'cc-hit text-accent'
+                  : 'cc-hit text-muted hover:text-text')
             }
           >
             <Globe size={18} />
@@ -404,8 +404,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             disabled={busy}
             onClick={() => onSendMode(sendMode === 'columns' ? 'off' : 'columns')}
             className={
-              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
-              (sendMode === 'columns' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')
+              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors disabled:opacity-25 ' +
+              (sendMode === 'columns' ? 'bg-accent/15 text-accent' : 'cc-hit text-muted hover:text-text')
             }
           >
             <CompareColumns size={18} />
@@ -417,8 +417,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             disabled={busy}
             onClick={() => onSendMode(sendMode === 'council' ? 'off' : 'council')}
             className={
-              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
-              (sendMode === 'council' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')
+              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors disabled:opacity-25 ' +
+              (sendMode === 'council' ? 'bg-accent/15 text-accent' : 'cc-hit text-muted hover:text-text')
             }
           >
             <Council size={18} />
@@ -436,7 +436,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           {busy ? (
             <button
               aria-label={t('chat.stop')}
-              className="cc-tap grid size-9 shrink-0 place-items-center rounded-full bg-bg transition-opacity active:opacity-70"
+              className="cc-tap grid size-9 shrink-0 place-items-center rounded-full bg-bg transition-colors duration-[var(--cc-dur-fast)] hover:bg-surface"
               onClick={onStop}
             >
               <Square size={14} />
@@ -445,7 +445,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             <button
               aria-label={t('chat.send')}
               disabled={!draft.trim() && !images.length && !files.length}
-              className="cc-tap grid size-9 shrink-0 place-items-center rounded-full bg-accent text-[var(--cc-on-accent)] transition-all active:scale-95 active:opacity-80 disabled:bg-transparent disabled:text-muted/40"
+              className="cc-tap grid size-9 shrink-0 place-items-center rounded-full bg-accent text-[var(--cc-on-accent)] transition-all duration-[var(--cc-dur-fast)] hover:bg-[var(--cc-accent-hover)] active:scale-95 disabled:bg-transparent disabled:text-muted/40"
               onClick={() => void handleSend()}
             >
               <ArrowUp size={17} />

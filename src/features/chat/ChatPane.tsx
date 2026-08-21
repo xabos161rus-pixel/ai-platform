@@ -671,7 +671,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             <button
               aria-label={t('chat.chatsAria')}
               onClick={onOpenNav}
-              className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted active:opacity-60 lg:hidden"
+              className="cc-hit grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted lg:hidden"
             >
               <PanelLeft size={20} />
             </button>
@@ -683,7 +683,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             <button
               aria-label={t('nav.toggleSidebar')}
               onClick={onToggleSidebar}
-              className={`hidden size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-opacity active:opacity-60 ${
+              className={`cc-hit hidden size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted ${
                 sidebarCollapsed ? 'lg:grid' : ''
               }`}
             >
@@ -706,7 +706,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             title={t('chat.systemPromptAria')}
             onClick={() => setPromptOpen(true)}
             disabled={!chat}
-            className={`grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors active:opacity-60 ${
+            className={`cc-hit grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] transition-colors ${
               chat?.systemPrompt ||
               chat?.temperature != null ||
               chat?.maxTokens != null ||
@@ -722,7 +722,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             title={t('chat.exportAria')}
             onClick={handleExport}
             disabled={!messages.length}
-            className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
+            className="cc-hit grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text disabled:opacity-25"
           >
             <Download size={18} />
           </button>
@@ -730,7 +730,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             <Link
               to="/settings"
               aria-label={t('nav.settings')}
-              className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60 lg:hidden"
+              className="cc-hit grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text lg:hidden"
             >
               <Settings size={18} />
             </Link>
@@ -740,7 +740,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
               aria-label={t('split.closeAria')}
               title={t('split.closeAria')}
               onClick={onClose}
-              className="grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text active:opacity-60"
+              className="cc-hit grid size-[var(--cc-touch)] shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text"
             >
               <X size={18} />
             </button>
@@ -989,7 +989,7 @@ const UserBubble = memo(function UserBubble({
         {message.images?.length ? (
           <div className="mb-1.5 flex flex-wrap justify-end gap-1.5">
             {message.images.map((src, i) => (
-              <button key={i} onClick={() => onView(src)} className="active:opacity-70">
+              <button key={i} onClick={() => onView(src)} className="cc-hit rounded-[var(--cc-radius-sm)]">
                 <img
                   src={src}
                   alt={t('chat.attachmentAlt')}
@@ -1015,7 +1015,7 @@ const UserBubble = memo(function UserBubble({
         ) : null}
         {message.content ? message.content : null}
       </div>
-      <div className="mt-1 flex items-center gap-2 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
+      <div className="mt-1 flex items-center gap-2 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-[var(--cc-dur-fast)] group-hover:opacity-100 lg:opacity-0 max-lg:opacity-100">
         <button
           aria-label={t('msg.edit')}
           disabled={busy}
@@ -1085,13 +1085,13 @@ function EditBox({
         />
         <div className="flex justify-end gap-2">
           <button
-            className="rounded-[var(--cc-radius-sm)] px-3 py-1.5 text-sm text-muted transition-colors hover:text-text active:opacity-60"
+            className="cc-hit rounded-[var(--cc-radius-sm)] px-3 py-1.5 text-sm text-muted transition-colors hover:text-text"
             onClick={onCancel}
           >
             {t('common.cancel')}
           </button>
           <button
-            className="rounded-[var(--cc-radius-sm)] bg-accent px-3 py-1.5 text-sm text-white active:opacity-80 disabled:opacity-40"
+            className="rounded-[var(--cc-radius-sm)] bg-accent px-3 py-1.5 text-sm text-[var(--cc-on-accent)] transition-colors duration-[var(--cc-dur-fast)] hover:bg-[var(--cc-accent-hover)] disabled:bg-[var(--cc-fill-disabled)] disabled:text-muted"
             disabled={!text.trim() && !message.images?.length && !message.files?.length}
             onClick={() => onSubmit(text)}
           >
@@ -1182,7 +1182,7 @@ const AssistantBlock = memo(function AssistantBlock({
             )}
           </>
         )}
-        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 max-lg:opacity-100">
+        <div className="mt-2 flex flex-wrap items-center gap-3 font-mono text-[length:var(--cc-text-caption)] text-muted opacity-0 transition-opacity duration-[var(--cc-dur-fast)] group-hover:opacity-100 max-lg:opacity-100">
           {!failed && message.tokensIn !== null && (message.tokensIn > 0 || message.tokensOut) ? (
             /* Один тихий ряд через точки, без скобок: мысли — подмножество
                out (куда ушёл счёт думающей модели), кеш — вход из кеша. */

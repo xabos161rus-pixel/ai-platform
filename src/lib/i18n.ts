@@ -323,6 +323,7 @@ const ru = {
   'error.noKeyInternal': 'не задан ключ',
   // Приветственные чипы (T8)
   'sidebar.spentMonth': 'За месяц',
+  'stats.peak': 'пик {v}',
   'welcome.card1': 'Разобрать документ',
   'welcome.card1Hint': 'PDF, Word или таблица — вытащу условия и цифры',
   'welcome.card2': 'Спросить две модели сразу',
@@ -660,6 +661,7 @@ const en: Record<TKey, string> = {
   'error.noProviderInternal': 'no provider selected',
   'error.noKeyInternal': 'no key set',
   'sidebar.spentMonth': 'This month',
+  'stats.peak': 'peak {v}',
   'welcome.card1': 'Break down a document',
   'welcome.card1Hint': 'PDF, Word or a spreadsheet — I will pull out the terms and numbers',
   'welcome.card2': 'Ask two models at once',

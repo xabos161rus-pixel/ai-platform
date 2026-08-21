@@ -203,7 +203,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
             акцентом, хоткей — тихой подписью справа (только с клавиатурой). */}
         <button
           onClick={onNew}
-          className="group flex min-h-[var(--cc-touch)] flex-1 items-center gap-2.5 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium transition-colors hover:bg-[var(--cc-fill-ghost-hover)] active:opacity-70"
+          className="cc-hit group flex min-h-[var(--cc-touch)] flex-1 items-center gap-2.5 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium transition-colors"
         >
           <SquarePen size={16} className="text-muted transition-colors group-hover:text-accent" />
           {t('chat.newChat')}
@@ -213,7 +213,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
           aria-label={t('sidebar.newFolderAria')}
           title={t('sidebar.newFolderAria')}
           onClick={() => setCreatingFolder((v) => !v)}
-          className="grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
+          className="cc-hit grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius)] text-muted transition-colors hover:text-text"
         >
           <FolderPlus size={17} />
         </button>
@@ -221,7 +221,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
           <button
             aria-label={t('common.close')}
             onClick={onClose}
-            className="grid size-[var(--cc-touch)] place-items-center rounded-[var(--cc-radius)] text-muted active:opacity-60"
+            className="cc-hit grid size-[var(--cc-touch)] place-items-center rounded-[var(--cc-radius)] text-muted"
           >
             <X size={19} />
           </button>
@@ -264,7 +264,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
             className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-muted"
           />
           {query && (
-            <button aria-label={t('sidebar.clearAria')} onClick={() => setQuery('')} className="text-muted active:opacity-60">
+            <button aria-label={t('sidebar.clearAria')} onClick={() => setQuery('')} className="cc-hit rounded-[var(--cc-radius-sm)] text-muted">
               <X size={14} />
             </button>
           )}
@@ -476,8 +476,8 @@ function ChatRow({
   const t = useT();
   return (
     <div
-      className={`group flex items-center gap-0.5 rounded-[var(--cc-radius)] px-1 transition-colors ${
-        active ? 'bg-[var(--cc-fill-control)]' : 'hover:bg-[var(--cc-fill-ghost-hover)]'
+      className={`group flex items-center gap-0.5 rounded-[var(--cc-radius)] px-1 transition-colors duration-[var(--cc-dur-fast)] ${
+        active ? 'bg-[var(--cc-fill-control)]' : 'hover:bg-[var(--cc-fill-hover)]'
       }`}
     >
       {renaming ? (
@@ -503,7 +503,10 @@ function ChatRow({
           }}
         />
       ) : (
-        <button onClick={onPick} className="min-w-0 flex-1 py-1.5 pl-2 text-left active:opacity-60">
+        <button
+          onClick={onPick}
+          className="min-w-0 flex-1 rounded-[var(--cc-radius)] py-1.5 pl-2 text-left active:bg-[var(--cc-fill-press)]"
+        >
           <span className="block truncate text-sm">{chat.title || t('chat.newChat')}</span>
           {fragment && (
             <span className="block truncate text-[length:var(--cc-text-caption)] text-muted">
@@ -517,7 +520,7 @@ function ChatRow({
       <button
         aria-label={t('sidebar.actionsAria')}
         onClick={(e) => onMenu(e.currentTarget.getBoundingClientRect())}
-        className={`grid size-8 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-opacity active:opacity-60 lg:opacity-0 lg:group-hover:opacity-100 ${
+        className={`cc-hit grid size-8 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-opacity lg:opacity-0 lg:group-hover:opacity-100 ${
           menuOpen ? 'lg:opacity-100' : ''
         }`}
       >
@@ -563,7 +566,7 @@ function RowMenu({
     : { left, bottom: window.innerHeight - rect.top + 4 };
 
   const itemClass =
-    'flex w-full items-center gap-2.5 rounded-[var(--cc-radius-sm)] px-2.5 py-2.5 text-left text-sm hover:bg-[var(--cc-fill-ghost-hover)] active:opacity-60';
+    'cc-hit flex w-full items-center gap-2.5 rounded-[var(--cc-radius-sm)] px-2.5 py-2.5 text-left text-sm';
 
   return createPortal(
     <>

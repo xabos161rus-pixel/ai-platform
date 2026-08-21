@@ -55,7 +55,7 @@ export const CompareGroup = memo(function CompareGroup({ group, messages, busy, 
           <button
             aria-label={t('msg.deleteBranch')}
             disabled={busy}
-            className="p-1 transition-colors hover:text-danger active:opacity-60 disabled:opacity-25"
+            className="cc-hit rounded-[var(--cc-radius-sm)] p-1 transition-colors hover:text-danger disabled:opacity-25"
             onClick={() => onDeleteBranch(node.id)}
           >
             <Trash2 size={13} />
@@ -108,7 +108,7 @@ export const CompareGroup = memo(function CompareGroup({ group, messages, busy, 
                 <span className="flex-1">
                   {m.tokensIn}→{m.tokensOut}
                 </span>
-                <button aria-label={t('chat.copy')} className="p-1 active:opacity-60" onClick={() => onCopy(m.content)}>
+                <button aria-label={t('chat.copy')} className="cc-hit rounded-[var(--cc-radius-sm)] p-1" onClick={() => onCopy(m.content)}>
                   <Copy size={13} />
                 </button>
                 {/* Выбор победителя — не украшение: в контекст следующего

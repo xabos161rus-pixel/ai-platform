@@ -27,7 +27,7 @@ function previewDoc(lang: string, code: string): string {
 
 /** Кнопки шапки — тач-таргет крупнее визуального размера на грубом указателе (палец). */
 const HEADER_BTN =
-  'grid size-8 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text active:opacity-60 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11';
+  'cc-hit grid size-8 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11';
 
 export function CodeBlock({ lang, code }: { lang: string; code: string }) {
   const t = useT();

@@ -155,7 +155,7 @@ export function SettingsPage() {
               <div
                 key={p.id}
                 className={`group flex items-center gap-2.5 rounded-[var(--cc-radius)] border border-hairline px-3 py-2.5 transition-colors ${
-                  settings.activeProviderId === p.id ? 'bg-surface-2' : 'hover:bg-[var(--cc-fill-ghost-hover)]'
+                  settings.activeProviderId === p.id ? 'bg-surface-2' : ''
                 }`}
               >
                 {/* Активность — клай-точкой, тем же маркером, что у ответов в
@@ -167,7 +167,7 @@ export function SettingsPage() {
                   }`}
                 />
                 <button
-                  className="min-w-0 flex-1 text-left active:opacity-60"
+                  className="cc-hit min-w-0 flex-1 rounded-[var(--cc-radius)] text-left"
                   onClick={() => void patchSettings({ activeProviderId: p.id, defaultModel: modelIds(p.models)[0] ?? 'demo-echo' })}
                 >
                   <span className="block truncate font-medium">{p.name}</span>
@@ -180,7 +180,7 @@ export function SettingsPage() {
                     <button
                       aria-label={t('settings.editAria')}
                       title={t('settings.editAria')}
-                      className="grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text active:opacity-60"
+                      className="cc-hit grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text"
                       onClick={() => setEditing(p)}
                     >
                       <Pencil size={15} />
@@ -188,7 +188,7 @@ export function SettingsPage() {
                     <button
                       aria-label={t('settings.deleteAria')}
                       title={t('settings.deleteAria')}
-                      className="grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-danger active:opacity-60"
+                      className="cc-hit grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-danger"
                       onClick={() => void handleRemoveProvider(p)}
                     >
                       <Trash2 size={15} />
@@ -200,7 +200,7 @@ export function SettingsPage() {
           </div>
           <button
             onClick={() => setAdding(true)}
-            className="mt-1 flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
+            className="cc-hit mt-1 flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:text-text"
           >
             <Plus size={16} />
             {t('settings.addProvider')}
@@ -215,7 +215,7 @@ export function SettingsPage() {
                 aria-pressed={settings.theme === theme}
                 onClick={() => void patchSettings({ theme })}
                 className={`rounded-[var(--cc-radius-sm)] px-4 py-1.5 text-sm font-medium transition-all ${
-                  settings.theme === theme ? 'bg-accent text-white' : 'text-muted hover:text-text'
+                  settings.theme === theme ? 'bg-accent text-[var(--cc-on-accent)] hover:bg-[var(--cc-accent-hover)]' : 'text-muted hover:text-text'
                 }`}
               >
                 {theme === 'dark' ? t('settings.theme.dark') : theme === 'light' ? t('settings.theme.light') : t('settings.system')}
@@ -232,7 +232,7 @@ export function SettingsPage() {
                 aria-pressed={(settings.language ?? 'system') === lang}
                 onClick={() => void patchSettings({ language: lang })}
                 className={`rounded-[var(--cc-radius-sm)] px-4 py-1.5 text-sm font-medium transition-all ${
-                  (settings.language ?? 'system') === lang ? 'bg-accent text-white' : 'text-muted hover:text-text'
+                  (settings.language ?? 'system') === lang ? 'bg-accent text-[var(--cc-on-accent)] hover:bg-[var(--cc-accent-hover)]' : 'text-muted hover:text-text'
                 }`}
               >
                 {lang === 'ru' ? 'Русский' : lang === 'en' ? 'English' : t('settings.system')}
@@ -349,7 +349,7 @@ export function SettingsPage() {
           <p className="mb-2 text-sm text-muted">{syncStatusText(t, syncCfg)}</p>
           <button
             onClick={() => setSyncOpen(true)}
-            className="flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
+            className="cc-hit flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:text-text"
           >
             <Cloud size={16} />
             {t('sync.configure')}
@@ -366,7 +366,7 @@ export function SettingsPage() {
                 </div>
                 <button
                   aria-label={t('settings.editAria')}
-                  className="grid size-9 place-items-center text-muted active:opacity-60"
+                  className="cc-hit grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted"
                   onClick={() => setEditingSnippet(s)}
                 >
                   <Pencil size={16} />
@@ -374,7 +374,7 @@ export function SettingsPage() {
                 {!s.builtin && (
                   <button
                     aria-label={t('settings.deleteAria')}
-                    className="grid size-9 place-items-center text-muted active:opacity-60"
+                    className="cc-hit grid size-9 place-items-center rounded-[var(--cc-radius-sm)] text-muted"
                     onClick={() => void handleRemoveSnippet(s)}
                   >
                     <Trash2 size={16} />
@@ -385,7 +385,7 @@ export function SettingsPage() {
           </div>
           <button
             onClick={() => setAddingSnippet(true)}
-            className="mt-1 flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text active:opacity-70"
+            className="cc-hit mt-1 flex min-h-[var(--cc-touch)] items-center gap-2 rounded-[var(--cc-radius)] px-2.5 text-sm font-medium text-muted transition-colors hover:text-text"
           >
             <Plus size={16} />
             {t('snippets.add')}

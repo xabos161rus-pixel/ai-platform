@@ -98,7 +98,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
                 }`}
               >
                 <button
-                  className="min-w-0 flex-1 text-left active:opacity-60"
+                  className="cc-hit min-w-0 flex-1 rounded-[var(--cc-radius)] text-left"
                   onClick={() => {
                     setText(p.prompt);
                     setRoleName(p.name);
@@ -110,7 +110,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
                 {p.builtin ? (
                   <span className="shrink-0 font-mono text-[length:var(--cc-text-caption)] text-muted">{t('persona.builtin')}</span>
                 ) : (
-                  <button aria-label={t('persona.deleteRoleAria')} className="shrink-0 p-1 active:opacity-60" onClick={() => void handleDelete(p)}>
+                  <button aria-label={t('persona.deleteRoleAria')} className="cc-hit shrink-0 rounded-[var(--cc-radius-sm)] p-1" onClick={() => void handleDelete(p)}>
                     <Trash2 size={15} />
                   </button>
                 )}
@@ -130,7 +130,7 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
                   {temperature === null ? t('params.default') : temperature.toFixed(1)}
                 </span>
                 <button
-                  className="p-1 text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
+                  className="cc-hit rounded-[var(--cc-radius-sm)] p-1 text-muted transition-colors hover:text-text disabled:opacity-25"
                   disabled={temperature === null}
                   onClick={() => setTemperature(null)}
                 >
