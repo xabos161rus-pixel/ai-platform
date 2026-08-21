@@ -248,7 +248,7 @@ await p.keyboard.press('Escape');
 await p.waitForTimeout(300);
 
 // Мысли модели: демо-ответ по умолчанию (demo-echo) шлёт синтетическое reasoning
-check((await p.textContent('body')).includes('мысли модели'), 'reasoning-блок у демо-ответа');
+check((await p.textContent('body')).includes('рассуждение'), 'reasoning-блок у демо-ответа');
 
 // Экспорт снапшота
 await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
@@ -996,7 +996,8 @@ check(
   (await p.textContent('body')).includes('Глубина рассуждения'),
   'параметры: регулятор глубины рассуждения на месте',
 );
-await p.getByRole('button', { name: 'Высокая', exact: true }).click();
+// Локатор через роль диалога: та же подпись появилась ещё и чипом в шапке.
+await p.getByRole('dialog').getByRole('button', { name: 'Высокая', exact: true }).click();
 await p.waitForTimeout(200);
 await p.getByRole('button', { name: 'Сохранить', exact: true }).click();
 await p.waitForTimeout(600);
@@ -1005,10 +1006,15 @@ await p.waitForTimeout(800);
 await p.getByRole('button', { name: 'Системный промпт' }).first().click();
 await p.waitForTimeout(500);
 const effortOn = await p
+  .getByRole('dialog')
   .getByRole('button', { name: 'Высокая', exact: true })
   .evaluate((el) => el.className.includes('bg-accent'))
   .catch(() => false);
 check(effortOn, 'параметры: выбранная глубина пережила перезагрузку');
+check(
+  (await p.textContent('header')).includes('Высокая'),
+  'заданная глубина видна чипом в шапке чата',
+);
 await p.keyboard.press('Escape');
 await p.waitForTimeout(400);
 check((await p.locator('[role="dialog"]').count()) === 0, 'шит закрывается по Esc');

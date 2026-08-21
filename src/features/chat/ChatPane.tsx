@@ -701,6 +701,21 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
               />
             )}
           </div>
+          {chat?.reasoningEffort && (
+            <button
+              onClick={() => setPromptOpen(true)}
+              title={t('params.effort')}
+              className="cc-hit hidden shrink-0 items-center gap-1 rounded-full bg-[var(--cc-fill-selected)] px-2 py-1 text-[length:var(--cc-text-caption)] text-accent sm:inline-flex"
+            >
+              {t(
+                chat.reasoningEffort === 'low'
+                  ? 'params.effortLow'
+                  : chat.reasoningEffort === 'medium'
+                    ? 'params.effortMedium'
+                    : 'params.effortHigh',
+              )}
+            </button>
+          )}
           <button
             aria-label={t('chat.systemPromptAria')}
             title={t('chat.systemPromptAria')}
@@ -1149,7 +1164,9 @@ const AssistantBlock = memo(function AssistantBlock({
         ) : (
           <>
             {message.toolTrace?.length ? <ToolTrace steps={message.toolTrace} /> : null}
-            {message.reasoning && <ReasoningBlock text={message.reasoning} />}
+            {message.reasoning && (
+              <ReasoningBlock text={message.reasoning} tokens={message.tokensReasoning} />
+            )}
             <Markdown text={message.content} sources={message.sources} />
             {!!message.sources?.length && (
               <div className="mt-2.5 border-t border-hairline pt-2">
