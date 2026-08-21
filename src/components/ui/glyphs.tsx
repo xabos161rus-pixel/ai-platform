@@ -16,11 +16,27 @@ interface GlyphProps extends SVGProps<SVGSVGElement> {
   strokeWidth?: number | string;
 }
 
+/**
+ * Оптическая компенсация штриха.
+ *
+ * Толщина задана в координатах картинки и масштабируется вместе с ней:
+ * при 1.75 в поле 24 линия на 11px превращается в 0.80 экранного пикселя
+ * и уходит в серость, а на 26px становится 1.90 и выглядит жирнее
+ * интерфейса — разброс в 2.4 раза на одном наборе. Держим экранную
+ * толщину в узком коридоре: 1.3px у мелких значков, 1.6px у крупных.
+ */
+function autoStroke(size: number): number {
+  const target = Math.min(1.6, Math.max(1.3, 1.3 + (size - 14) * 0.0375));
+  return Number(((target * 24) / size).toFixed(2));
+}
+
 function glyph(name: string, draw: ReactNode) {
   const C = forwardRef<SVGSVGElement, GlyphProps>(function Glyph(
-    { size = 24, strokeWidth: sw = 1.75, className = '', ...rest },
+    { size = 24, strokeWidth, className = '', ...rest },
     ref,
   ) {
+    // Явно переданная толщина всегда сильнее расчёта.
+    const sw = strokeWidth ?? (typeof size === 'number' ? autoStroke(size) : 1.75);
     return (
       <svg
         ref={ref}
