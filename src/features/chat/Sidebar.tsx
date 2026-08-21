@@ -189,7 +189,11 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
   return (
     <aside
       className={`flex w-72 shrink-0 flex-col border-r border-hairline bg-surface ${
-        overlay ? 'h-full' : sidebarCollapsed ? 'hidden' : 'hidden lg:flex'
+        overlay
+          ? 'h-full max-w-[85vw] pl-[env(safe-area-inset-left)]'
+          : sidebarCollapsed
+            ? 'hidden'
+            : 'hidden lg:flex'
       }`}
     >
       <div className="flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+10px)] pb-2">
@@ -413,7 +417,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
         )}
       </nav>
 
-      <div className="border-t border-hairline">
+      <div className="border-t border-hairline pb-[env(safe-area-inset-bottom)]">
         <Link
           to="/stats"
           className="flex min-h-[var(--cc-touch)] items-center gap-2 px-4 text-sm text-muted transition-colors hover:text-text"
@@ -548,7 +552,9 @@ function RowMenu({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const left = Math.max(8, Math.min(rect.right - 224, window.innerWidth - 232));
+  // 14rem при корне 17px = 238px; на узком экране ужимаем до ширины экрана.
+  const menuW = Math.min(238, window.innerWidth - 16);
+  const left = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
   const openDown = rect.bottom + 280 < window.innerHeight;
   const style: React.CSSProperties = openDown
     ? { left, top: rect.bottom + 4 }
@@ -559,10 +565,10 @@ function RowMenu({
 
   return createPortal(
     <>
-      <button aria-label={t('common.close')} className="fixed inset-0 z-[60]" onClick={onClose} />
+      <button aria-label={t('common.close')} className="fixed inset-0 z-[var(--cc-z-sheet)]" onClick={onClose} />
       <div
         style={style}
-        className="animate-fade-in fixed z-[61] w-56 rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--shadow-pop)]"
+        className="animate-pop-in fixed z-[var(--cc-z-full)] w-[min(14rem,calc(100vw-1rem))] rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--cc-elev-overlay)]"
       >
         {view === 'root' ? (
           <>

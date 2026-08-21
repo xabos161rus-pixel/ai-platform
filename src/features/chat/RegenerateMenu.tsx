@@ -32,7 +32,9 @@ export function RegenerateMenu({ rect, providers, currentProviderId, currentMode
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const left = Math.max(8, Math.min(rect.right - 240, window.innerWidth - 248));
+  // 15rem при корне 17px = 255px; на узком экране ужимаем до ширины экрана.
+  const menuW = Math.min(255, window.innerWidth - 16);
+  const left = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
   const openDown = rect.bottom + 320 < window.innerHeight;
   const style: React.CSSProperties = openDown
     ? { left, top: rect.bottom + 4 }
@@ -43,10 +45,10 @@ export function RegenerateMenu({ rect, providers, currentProviderId, currentMode
 
   return createPortal(
     <>
-      <button aria-label={t('common.close')} className="fixed inset-0 z-[60]" onClick={onClose} />
+      <button aria-label={t('common.close')} className="fixed inset-0 z-[var(--cc-z-sheet)]" onClick={onClose} />
       <div
         style={style}
-        className="animate-fade-in fixed z-[61] max-h-80 w-60 overflow-y-auto rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--shadow-pop)]"
+        className="cc-scroll animate-pop-in fixed z-[var(--cc-z-full)] max-h-80 w-[min(15rem,calc(100vw-1rem))] overflow-y-auto rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--cc-elev-overlay)]"
       >
         <button
           className={itemClass}

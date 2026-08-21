@@ -997,12 +997,12 @@ const UserBubble = memo(function UserBubble({
         <button
           aria-label={t('msg.edit')}
           disabled={busy}
-          className="p-1 active:opacity-60 disabled:opacity-25"
+          className="cc-tap cc-hit rounded-[var(--cc-radius-sm)] p-1 disabled:opacity-25"
           onClick={() => onStartEdit(message.id)}
         >
           <Pencil size={13} />
         </button>
-        <button aria-label={t('chat.copy')} className="p-1 active:opacity-60" onClick={() => onCopy(message.content)}>
+        <button aria-label={t('chat.copy')} className="cc-tap cc-hit rounded-[var(--cc-radius-sm)] p-1" onClick={() => onCopy(message.content)}>
           <Copy size={13} />
         </button>
         <VersionNav messages={messages} node={node} disabled={busy} onSwitch={onSwitch} />
@@ -1173,7 +1173,7 @@ const AssistantBlock = memo(function AssistantBlock({
           ) : null}
           {!failed && message.model && <span className="truncate">{modelLabel(message.model)}</span>}
           {!failed && (
-            <button aria-label={t('chat.copy')} className="p-1 active:opacity-60" onClick={() => onCopy(message.content)}>
+            <button aria-label={t('chat.copy')} className="cc-tap cc-hit rounded-[var(--cc-radius-sm)] p-1" onClick={() => onCopy(message.content)}>
               <Copy size={13} />
             </button>
           )}
@@ -1181,7 +1181,7 @@ const AssistantBlock = memo(function AssistantBlock({
           <button
             aria-label={t('chat.retry')}
             disabled={busy || !canRegenerate}
-            className="p-1 active:opacity-60 disabled:opacity-25"
+            className="cc-tap cc-hit rounded-[var(--cc-radius-sm)] p-1 disabled:opacity-25"
             onClick={(e) => setMenuRect(e.currentTarget.getBoundingClientRect())}
           >
             <RotateCcw size={13} />
@@ -1189,7 +1189,7 @@ const AssistantBlock = memo(function AssistantBlock({
           <button
             aria-label={t('msg.deleteBranch')}
             disabled={busy}
-            className="p-1 transition-colors hover:text-danger active:opacity-60 disabled:opacity-25"
+            className="cc-tap cc-hit rounded-[var(--cc-radius-sm)] p-1 hover:text-danger disabled:opacity-25"
             onClick={() => onDeleteBranch(node.id)}
           >
             <Trash2 size={13} />

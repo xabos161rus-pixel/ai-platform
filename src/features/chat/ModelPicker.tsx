@@ -44,7 +44,7 @@ export function ModelPicker({ providers, providerId, model, onChange }: Props) {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex max-w-[60vw] items-center gap-1 rounded-[var(--cc-radius-sm)] px-1.5 py-0.5 font-mono text-[length:var(--cc-text-caption)] text-muted transition-colors hover:bg-[var(--cc-fill-ghost-hover)] hover:text-text"
+        className="cc-hit flex max-w-[60vw] items-center gap-1 rounded-[var(--cc-radius-sm)] px-2 py-1.5 font-mono text-[length:var(--cc-text-caption)] text-muted hover:text-text"
       >
         <span className="truncate">
           {/* У демо лейбл модели уже говорит «Демо …» — префикс провайдера
@@ -55,7 +55,7 @@ export function ModelPicker({ providers, providerId, model, onChange }: Props) {
       </button>
 
       {open && (
-        <div className="animate-fade-in absolute top-full left-0 z-40 mt-1 max-h-80 w-72 overflow-y-auto rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--shadow-pop)]">
+        <div className="cc-scroll animate-pop-in absolute top-full left-0 z-[var(--cc-z-popover)] mt-1 max-h-80 w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-[var(--cc-radius)] border border-hairline bg-elevated p-1 shadow-[var(--cc-elev-overlay)]">
           {providers.map((p) => (
             <div key={p.id}>
               <p className="px-2 pt-2 pb-1 text-[length:var(--cc-text-caption)] font-medium text-muted">

@@ -137,7 +137,10 @@ export function ChatPage() {
   }, []);
 
   return (
-    <div ref={frameRef} className="fixed inset-0 flex bg-bg">
+    <div
+      ref={frameRef}
+      className="fixed inset-0 flex bg-bg pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+    >
       {/* Аврора: fixed-слой позади всего контента, вне потока — скролл ленты
           его не задевает. Позиционированные (fixed) потомки красятся ПОСЛЕ
           обычных статичных — без z-index на контент-обёртке ниже аврора легла

@@ -275,6 +275,25 @@ summary {
   font-variant-numeric: tabular-nums;
 }
 
+/* Иконочная кнопка в плотном ряду: мышью хватает 21px, пальцем — нет.
+   Расширяем зону касания, не трогая рисунок ряда на десктопе. */
+@media (pointer: coarse) {
+  .cc-tap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--cc-touch);
+    min-height: var(--cc-touch);
+  }
+  /* Там, где кнопку нельзя увеличить визуально (крестик поверх превью),
+     зону касания растит невидимый ореол. */
+  .cc-tap-halo::after {
+    content: '';
+    position: absolute;
+    inset: -0.6rem;
+  }
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

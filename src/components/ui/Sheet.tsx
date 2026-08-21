@@ -99,7 +99,7 @@ export function Sheet({ open, onClose, title, children }: Props) {
           </h2>
           <button
             aria-label={t('common.close')}
-            className="cc-hit grid size-10 place-items-center rounded-full bg-surface-2"
+            className="cc-hit grid size-10 place-items-center rounded-full bg-[var(--cc-fill-control)]"
             onClick={onClose}
           >
             <X size={18} />

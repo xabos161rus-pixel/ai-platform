@@ -259,7 +259,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
               <img src={src} alt={t('chat.attachmentAlt')} className="size-14 rounded-[var(--cc-radius-sm)] border border-hairline object-cover" />
               <button
                 aria-label={t('composer.removeImageAria')}
-                className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-hairline bg-surface-2 text-muted active:opacity-60"
+                className="cc-tap-halo absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full border border-hairline bg-surface-2 text-muted active:opacity-60"
                 onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
               >
                 <X size={11} />
@@ -375,7 +375,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             aria-label={t('chat.attachFile')}
             disabled={busy}
             onClick={() => fileRef.current?.click()}
-            className="grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
+            className="cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] text-muted transition-colors hover:text-text active:opacity-60 disabled:opacity-25"
           >
             <Paperclip size={18} />
           </button>
@@ -384,7 +384,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             title={t(`agent.mode.${toolMode}`)}
             onClick={() => onToolMode(NEXT_TOOL_MODE[toolMode])}
             className={
-              'grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 ' +
+              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 ' +
               (toolMode === 'research'
                 ? 'bg-accent/15 text-accent'
                 : toolMode === 'tools'
@@ -404,7 +404,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             disabled={busy}
             onClick={() => onSendMode(sendMode === 'columns' ? 'off' : 'columns')}
             className={
-              'grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
+              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
               (sendMode === 'columns' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')
             }
           >
@@ -417,7 +417,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             disabled={busy}
             onClick={() => onSendMode(sendMode === 'council' ? 'off' : 'council')}
             className={
-              'grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
+              'cc-tap grid size-9 shrink-0 place-items-center rounded-[var(--cc-radius-sm)] transition-colors active:opacity-60 disabled:opacity-25 ' +
               (sendMode === 'council' ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text')
             }
           >
@@ -436,7 +436,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           {busy ? (
             <button
               aria-label={t('chat.stop')}
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-bg transition-opacity active:opacity-70"
+              className="cc-tap grid size-9 shrink-0 place-items-center rounded-full bg-bg transition-opacity active:opacity-70"
               onClick={onStop}
             >
               <Square size={14} />
@@ -445,7 +445,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             <button
               aria-label={t('chat.send')}
               disabled={!draft.trim() && !images.length && !files.length}
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-white transition-all active:scale-95 active:opacity-80 disabled:bg-transparent disabled:text-muted/40"
+              className="cc-tap grid size-9 shrink-0 place-items-center rounded-full bg-accent text-[var(--cc-on-accent)] transition-all active:scale-95 active:opacity-80 disabled:bg-transparent disabled:text-muted/40"
               onClick={() => void handleSend()}
             >
               <ArrowUp size={17} />
