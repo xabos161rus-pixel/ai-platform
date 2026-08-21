@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import {
@@ -21,11 +22,11 @@ import {
   X,
 } from '../../components/ui/glyphs';
 import type { Chat } from '../../db/types';
-import { listFolders, patchChat, removeChat } from '../../lib/ai/chatRepo';
+import { listFolders, monthSpendRub, patchChat, removeChat } from '../../lib/ai/chatRepo';
 import { searchAll, type SearchHit } from '../../lib/search';
 import { t, useT } from '../../lib/i18n';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
+import { formatCost } from '../../lib/ai/models';
 
 interface Props {
   chats: Chat[];
@@ -418,6 +419,7 @@ export function Sidebar({ chats, activeId, onPick, onNew, overlay = false, onClo
       </nav>
 
       <div className="border-t border-hairline pb-[env(safe-area-inset-bottom)]">
+        <SpendRow />
         <Link
           to="/stats"
           className="flex min-h-[var(--cc-touch)] items-center gap-2 px-4 text-sm text-muted transition-colors hover:text-text"
@@ -702,3 +704,38 @@ function RowMenu({
     document.body,
   );
 }
+
+/**
+ * Строка расхода за текущий месяц. При заданном бюджете — тонкая полоса
+ * заполнения: цифра «сколько уже» без «из скольких» ни о чём не говорит.
+ */
+function SpendRow() {
+  const t = useT();
+  const settings = useLiveQuery(() => db.settings.get('app'), []);
+  const spent = useLiveQuery(() => monthSpendRub(), [], 0);
+  const budget = settings?.monthlyBudgetRub ?? 0;
+  if (!spent && !budget) return null;
+  const share = budget > 0 ? Math.min(1, spent / budget) : 0;
+  return (
+    <Link to="/stats" className="cc-hit block px-4 pt-2.5 pb-1.5">
+      <div className="flex items-baseline justify-between gap-2 text-[length:var(--cc-text-caption)]">
+        <span className="text-muted">{t('sidebar.spentMonth')}</span>
+        <span className="cc-num font-mono">
+          {formatCost(spent)}
+          {budget > 0 && <span className="text-muted"> / {budget} ₽</span>}
+        </span>
+      </div>
+      {budget > 0 && (
+        <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-[var(--cc-fill-control)]">
+          <div
+            className={`h-full rounded-full transition-[width] duration-[var(--cc-dur-base)] ${
+              share >= 1 ? 'bg-danger' : share >= 0.8 ? 'bg-warning' : 'bg-accent'
+            }`}
+            style={{ width: `${Math.round(share * 100)}%` }}
+          />
+        </div>
+      )}
+    </Link>
+  );
+}
+

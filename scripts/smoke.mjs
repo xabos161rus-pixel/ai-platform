@@ -321,17 +321,18 @@ await activateDemo();
   idb.close();
 }); конец прежнего inline-кода */
 
-// Приветственные чипы: показываются на пустом чате, клик вставляет текст без отправки.
+// Первый экран: карточки режимов на пустом чате, клик вставляет промпт без отправки.
 await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
 await p.waitForTimeout(600);
 await p.getByRole('button', { name: 'Новый чат' }).first().click();
 await p.waitForTimeout(600);
-check((await p.textContent('body')).includes('Разбери этот документ по пунктам'), 'приветственные чипы показаны на пустом чате');
-await p.getByRole('button', { name: 'Разбери этот документ по пунктам' }).click();
+check((await p.textContent('body')).includes('Разобрать документ'), 'карточки режимов показаны на пустом чате');
+check((await p.textContent('body')).includes('Собрать консилиум'), 'на первом экране виден консилиум');
+await p.getByRole('button', { name: /Разобрать документ/ }).click();
 await p.waitForTimeout(300);
 check(
   (await p.getByPlaceholder('Спросите что угодно…').inputValue()) === 'Разбери этот документ по пунктам',
-  'чип вставил текст в композер без отправки',
+  'карточка вставила промпт в композер без отправки',
 );
 
 // Esc останавливает активную генерацию (приоритет над просмотрщиком изображения)

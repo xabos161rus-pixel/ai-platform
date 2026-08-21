@@ -130,16 +130,18 @@ export function SettingsPage() {
   if (!settings) return null;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-bg">
+    <div className="fixed inset-0 flex flex-col bg-bg pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-2 pt-[calc(env(safe-area-inset-top)+8px)] pb-2">
-        <Link
-          to="/"
-          aria-label={t('settings.backAria')}
-          className="grid size-[var(--cc-touch)] place-items-center rounded-[var(--cc-radius)] text-accent active:opacity-60"
-        >
-          <ChevronLeft size={22} />
-        </Link>
-        <h1 className="flex-1 text-[0.95rem] font-semibold">{t('nav.settings')}</h1>
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
+          <Link
+            to="/"
+            aria-label={t('settings.backAria')}
+            className="cc-hit grid size-[var(--cc-touch)] place-items-center rounded-[var(--cc-radius)] text-accent"
+          >
+            <ChevronLeft size={22} />
+          </Link>
+          <h1 className="flex-1 text-[length:var(--cc-text-lg)] font-semibold">{t('nav.settings')}</h1>
+        </div>
       </header>
 
       <div className="cc-scroll mx-auto w-full max-w-3xl flex-1 space-y-8 overflow-y-auto px-4 py-5 pb-[calc(env(safe-area-inset-bottom)+24px)]">

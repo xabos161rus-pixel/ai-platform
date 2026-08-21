@@ -2,15 +2,17 @@ import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo,
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router';
 import {
+  CompareColumns,
   Copy,
+  Council,
   Download,
   FileText,
+  Globe,
   PanelLeft,
   Pencil,
   RotateCcw,
   ScrollText,
   Settings,
-  Sparkles,
   Trash2,
   X,
 } from '../../components/ui/glyphs';
@@ -888,26 +890,46 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
   );
 });
 
+/**
+ * Первый экран чата. Был столбик подсказок по центру под иконкой — самая
+ * дешёвая композиция из возможных: она ничего не сообщала о платформе.
+ * Теперь это четыре её собственных режима, которых нет у обычного чата:
+ * разбор файлов, сравнение моделей, консилиум, поиск со сносками.
+ */
 function Welcome({ demo, onPick }: { demo: boolean; onPick: (text: string) => void }) {
   const t = useT();
-  const chips = [t('welcome.chip1'), t('welcome.chip2'), t('welcome.chip3'), t('welcome.chip4')];
+  const cards = [
+    { icon: FileText, title: t('welcome.card1'), hint: t('welcome.card1Hint'), prompt: t('welcome.chip1') },
+    { icon: CompareColumns, title: t('welcome.card2'), hint: t('welcome.card2Hint'), prompt: t('welcome.chip2') },
+    { icon: Council, title: t('welcome.card3'), hint: t('welcome.card3Hint'), prompt: t('welcome.chip3') },
+    { icon: Globe, title: t('welcome.card4'), hint: t('welcome.card4Hint'), prompt: t('welcome.chip4') },
+  ];
   return (
-    <div className="flex flex-col items-center gap-3 py-10 text-center sm:py-16">
-      <div className="grid size-14 place-items-center rounded-[var(--cc-radius)] bg-surface-2 text-accent">
-        <Sparkles size={26} />
+    <div className="flex flex-col gap-6 py-8 sm:py-12">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-[length:var(--cc-text-display)] font-semibold tracking-[-0.015em]">
+          {t('chat.welcomeTitle')}
+        </h1>
+        <p className="flex items-center gap-2 text-[length:var(--cc-text-meta)] text-muted">
+          <span
+            aria-hidden="true"
+            className={`size-1.5 shrink-0 rounded-full ${demo ? 'bg-warning' : 'bg-success'}`}
+          />
+          {demo ? t('chat.welcomeDemo') : t('chat.welcomeReal')}
+        </p>
       </div>
-      <p className="font-medium">{t('chat.welcomeTitle')}</p>
-      <p className="max-w-xs text-sm leading-relaxed text-muted">
-        {demo ? t('chat.welcomeDemo') : t('chat.welcomeReal')}
-      </p>
-      <div className="mt-1 flex max-w-md flex-wrap items-center justify-center gap-2">
-        {chips.map((chip) => (
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {cards.map((c) => (
           <button
-            key={chip}
-            onClick={() => onPick(chip)}
-            className="min-h-[var(--cc-touch)] rounded-full border border-hairline bg-surface-2/50 px-3.5 py-2 text-sm transition-colors hover:border-accent hover:text-accent active:opacity-70"
+            key={c.title}
+            onClick={() => onPick(c.prompt)}
+            className="cc-hit flex items-start gap-3 rounded-[var(--cc-radius-lg)] border border-hairline bg-surface p-4 text-left shadow-[var(--cc-elev-rest)]"
           >
-            {chip}
+            <c.icon size={18} className="mt-0.5 shrink-0 text-accent" />
+            <span className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">{c.title}</span>
+              <span className="text-[length:var(--cc-text-caption)] leading-relaxed text-muted">{c.hint}</span>
+            </span>
           </button>
         ))}
       </div>
