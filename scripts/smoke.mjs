@@ -982,6 +982,37 @@ await p.getByRole('button', { name: 'Закрыть панель' }).click();
 await p.waitForTimeout(400);
 check((await p.locator('header').count()) === 1, 'сплит: панель закрылась крестиком');
 
+// ── T-усилие: глубина рассуждения сохраняется в чат и переживает перезагрузку.
+// Ставится последней: оставляет за собой чат с заданным параметром.
+await activateDemo();
+await p.setViewportSize({ width: 1400, height: 800 });
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Новый чат' }).first().click();
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Системный промпт' }).first().click();
+await p.waitForTimeout(400);
+check(
+  (await p.textContent('body')).includes('Глубина рассуждения'),
+  'параметры: регулятор глубины рассуждения на месте',
+);
+await p.getByRole('button', { name: 'Высокая', exact: true }).click();
+await p.waitForTimeout(200);
+await p.getByRole('button', { name: 'Сохранить', exact: true }).click();
+await p.waitForTimeout(600);
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(800);
+await p.getByRole('button', { name: 'Системный промпт' }).first().click();
+await p.waitForTimeout(500);
+const effortOn = await p
+  .getByRole('button', { name: 'Высокая', exact: true })
+  .evaluate((el) => el.className.includes('bg-accent'))
+  .catch(() => false);
+check(effortOn, 'параметры: выбранная глубина пережила перезагрузку');
+await p.keyboard.press('Escape');
+await p.waitForTimeout(400);
+check((await p.locator('[role="dialog"]').count()) === 0, 'шит закрывается по Esc');
+
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
 

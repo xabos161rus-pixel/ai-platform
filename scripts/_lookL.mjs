@@ -1,0 +1,30 @@
+import { chromium } from 'playwright';
+const OUT = process.argv[2];
+const BASE = 'http://localhost:4174/ai-platform';
+const b = await chromium.launch();
+const ctx = await b.newContext({ locale: 'ru-RU', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+const p = await ctx.newPage();
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(900);
+await p.getByRole('button', { name: 'Светлая' }).click();
+await p.waitForTimeout(600);
+await p.screenshot({ path: `${OUT}/L1-settings.png` });
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(900);
+await p.screenshot({ path: `${OUT}/L2-welcome.png` });
+await p.getByPlaceholder('Спросите что угодно…').fill('Покажи таблицу сравнения и блок кода на python');
+await p.getByRole('button', { name: 'Отправить' }).click();
+await p.waitForTimeout(6500);
+await p.screenshot({ path: `${OUT}/L3-chat.png` });
+// Шит поверх светлой темы — проверяем размытие и тень.
+await p.locator('button[aria-label*="Системный"], button[title*="Системный"]').first().click().catch(() => {});
+await p.waitForTimeout(700);
+await p.screenshot({ path: `${OUT}/L4-sheet.png` });
+// Вернуть тёмную, чтобы не оставлять базу в чужом состоянии.
+await p.keyboard.press('Escape');
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(600);
+await p.getByRole('button', { name: 'Тёмная' }).click();
+await p.waitForTimeout(400);
+await b.close();
+console.log('ok');
