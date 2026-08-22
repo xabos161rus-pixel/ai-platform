@@ -36,7 +36,7 @@ export const VersionNav = memo(function VersionNav({ messages, node, disabled, o
         aria-label={t('branch.prevVersion')}
         disabled={disabled || index <= 0}
         onClick={() => go(-1)}
-        className="flex h-[var(--cc-touch)] items-center px-0.5 disabled:opacity-25 active:opacity-60"
+        className="cc-hit flex h-[var(--cc-touch)] items-center rounded-[var(--cc-radius-sm)] px-1 disabled:opacity-25"
       >
         <ChevronLeft size={13} />
       </button>
@@ -47,7 +47,7 @@ export const VersionNav = memo(function VersionNav({ messages, node, disabled, o
         aria-label={t('branch.nextVersion')}
         disabled={disabled || index >= list.length - 1}
         onClick={() => go(1)}
-        className="flex h-[var(--cc-touch)] items-center px-0.5 disabled:opacity-25 active:opacity-60"
+        className="cc-hit flex h-[var(--cc-touch)] items-center rounded-[var(--cc-radius-sm)] px-1 disabled:opacity-25"
       >
         <ChevronRight size={13} />
       </button>

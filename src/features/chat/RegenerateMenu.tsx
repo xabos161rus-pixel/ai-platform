@@ -41,7 +41,7 @@ export function RegenerateMenu({ rect, providers, currentProviderId, currentMode
     : { left, bottom: window.innerHeight - rect.top + 4 };
 
   const itemClass =
-    'flex w-full items-center gap-2.5 rounded-[var(--cc-radius-sm)] px-2.5 py-2.5 text-left text-sm hover:bg-[var(--cc-fill-ghost-hover)] active:opacity-60';
+    'cc-hit flex w-full items-center gap-2.5 rounded-[var(--cc-radius-sm)] px-2.5 py-2.5 text-left text-sm';
 
   return createPortal(
     <>

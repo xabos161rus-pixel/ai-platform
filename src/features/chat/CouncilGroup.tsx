@@ -94,7 +94,7 @@ export function CouncilGroup({
               {final.model && <span className="truncate">{modelLabel(final.model)}</span>}
               <button
                 aria-label={t('chat.copy')}
-                className="p-1 transition-colors hover:text-text active:opacity-60"
+                className="cc-hit rounded-[var(--cc-radius-sm)] p-1 hover:text-text"
                 onClick={() => onCopy(final.content)}
               >
                 {t('chat.copy')}

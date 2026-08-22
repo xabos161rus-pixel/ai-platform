@@ -98,7 +98,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
           <p className="text-sm text-muted">{t('app.errorHint')}</p>
           <button
             onClick={() => window.location.reload()}
-            className="rounded-[var(--cc-radius)] bg-accent px-5 py-3 font-medium text-[var(--cc-on-accent)] active:opacity-80"
+            className="rounded-[var(--cc-radius)] bg-accent px-5 py-3 font-medium text-[var(--cc-on-accent)] transition-colors duration-[var(--cc-dur-fast)] hover:bg-[var(--cc-accent-hover)]"
           >
             {t('app.reload')}
           </button>

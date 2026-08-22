@@ -34,7 +34,7 @@ function StepRow({ step, expanded, onToggle }: { step: ToolStep; expanded: boole
     <div>
       <button
         onClick={onToggle}
-        className="flex min-h-[var(--cc-touch)] w-full items-center gap-1.5 text-left font-mono text-[length:var(--cc-text-caption)] text-muted transition-colors hover:text-text active:opacity-60"
+        className="cc-hit flex min-h-[var(--cc-touch)] w-full items-center gap-1.5 rounded-[var(--cc-radius-sm)] px-1.5 text-left font-mono text-[length:var(--cc-text-caption)] text-muted hover:text-text"
       >
         <span aria-hidden>▸</span>
         <span className="truncate">
@@ -91,7 +91,7 @@ export function ToolTrace({ steps, live }: { steps: ToolStep[]; live?: boolean }
     <div className="mb-2">
       <button
         onClick={() => setHistoryOpen((v) => !v)}
-        className="flex items-center gap-1 font-mono text-[length:var(--cc-text-caption)] text-muted transition-colors hover:text-text active:opacity-60"
+        className="cc-hit flex items-center gap-1 rounded-[var(--cc-radius-sm)] px-1 py-0.5 font-mono text-[length:var(--cc-text-caption)] text-muted hover:text-text"
       >
         <ChevronRight size={12} className={`transition-transform ${historyOpen ? 'rotate-90' : ''}`} />
         {t('trace.label', { n: steps.length })}
