@@ -10,7 +10,7 @@
 // платформа BYOK, посредников между пользователем и его ключом нет.
 
 import type { Provider } from '../../db/types';
-import { providerHeaders } from './presets';
+import { dropsTemperature, providerHeaders, providerTuning } from './presets';
 import { estimateTokens } from './models';
 import { getLang, t } from '../i18n';
 
@@ -430,8 +430,10 @@ export async function streamChat(params: {
   wireTail?: WireAgentMsg[];
   /** Демо без задержки стрима — для стадий, которые не смотрят в реальном времени (консилиум). Живых провайдеров не касается. */
   demoInstant?: boolean;
+  /** Вызывается, если провайдер отверг настройку глубины и запрос повторён без неё. */
+  onEffortDropped?: () => void;
 }): Promise<Reply> {
-  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, reasoningEffort, tools, wireTail, demoInstant } = params;
+  const { provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, reasoningEffort, tools, wireTail, demoInstant, onEffortDropped } = params;
   if (!provider) throw new AiError('no_provider', t('error.noProviderInternal'));
   // Демо-путь параметры игнорирует — заглушка не читает temperature/maxTokens/tools.
   if (provider.isDemo) return streamDemo(messages, systemPrompt, model, onDelta, signal, onReasoning, demoInstant);
@@ -439,32 +441,52 @@ export async function streamChat(params: {
 
   const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const wireMessages = [...toWire(messages), ...(wireTail ?? [])];
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...providerHeaders(provider.baseUrl, provider.apiKey),
-      },
-      body: JSON.stringify({
-        model,
-        messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...wireMessages] : wireMessages,
-        stream: true,
-        // Просим прислать usage последним событием. Провайдеры, которые этого
-        // не умеют, поле просто игнорируют — тогда счётчик останется нулевым,
-        // и лучше показать ноль, чем выдуманную оценку.
-        stream_options: { include_usage: true },
-        ...(typeof temperature === 'number' && { temperature }),
-        ...(typeof maxTokens === 'number' && { max_tokens: maxTokens }),
-        ...(reasoningEffort && { reasoning_effort: reasoningEffort }),
-        ...(tools?.length && { tools }),
-      }),
-      signal,
+  // Управление глубиной мышления у вендоров разное: у OpenAI-совместимых это
+  // reasoning_effort, у Anthropic — thinking/output_config, причём вариант
+  // зависит от поколения модели. Подробности и причины — в presets.ts.
+  const tuning = providerTuning(provider.baseUrl, { model, reasoningEffort, temperature, maxTokens });
+  const sendTemperature = typeof temperature === 'number' && !dropsTemperature(provider.baseUrl, tuning);
+
+  const buildBody = (extra: Record<string, unknown>) =>
+    JSON.stringify({
+      model,
+      messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...wireMessages] : wireMessages,
+      stream: true,
+      // Просим прислать usage последним событием. Провайдеры, которые этого
+      // не умеют, поле просто игнорируют — тогда счётчик останется нулевым,
+      // и лучше показать ноль, чем выдуманную оценку.
+      stream_options: { include_usage: true },
+      ...(sendTemperature && { temperature }),
+      ...(typeof maxTokens === 'number' && { max_tokens: maxTokens }),
+      ...extra,
+      ...(tools?.length && { tools }),
     });
-  } catch (e) {
-    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', t('error.abortedInternal'));
-    throw new AiError('network', t('error.noConnectionInternal'));
+
+  const send = async (extra: Record<string, unknown>): Promise<Response> => {
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...providerHeaders(provider.baseUrl, provider.apiKey),
+        },
+        body: buildBody(extra),
+        signal,
+      });
+    } catch (e) {
+      if ((e as { name?: string })?.name === 'AbortError') throw new AiError('aborted', t('error.abortedInternal'));
+      throw new AiError('network', t('error.noConnectionInternal'));
+    }
+  };
+
+  let res = await send(tuning);
+  // Настройки мышления — единственные поля, по которым провайдеры расходятся
+  // сильнее всего: у Anthropic ручной бюджет отвергается новыми моделями, а
+  // адаптивный режим — старыми, и обе ошибки приходят как 400. Ответ важнее
+  // регулятора: повторяем запрос без них, чтобы чат не падал из-за настройки.
+  if (!res.ok && res.status === 400 && Object.keys(tuning).length) {
+    onEffortDropped?.();
+    res = await send({});
   }
   if (!res.ok) throw await toAiError(res);
 

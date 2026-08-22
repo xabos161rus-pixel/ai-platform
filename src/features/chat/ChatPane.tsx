@@ -298,6 +298,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             signal: ac.signal,
             temperature: typeof chat.temperature === 'number' ? chat.temperature : undefined,
             reasoningEffort: chat.reasoningEffort ?? undefined,
+            onEffortDropped: () => toast(t('agent.effortDropped')),
             maxTokens: typeof chat.maxTokens === 'number' ? chat.maxTokens : undefined,
             onDelta,
             onReasoning,
@@ -332,6 +333,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
               setAgentSteps(stepsAcc);
             },
             onToolsUnsupported: () => toast(t('agent.toolsUnsupported')),
+            onEffortDropped: () => toast(t('agent.effortDropped')),
           });
         }
         await addAssistantMessage(chat.id, reply, {

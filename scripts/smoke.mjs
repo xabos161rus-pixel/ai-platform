@@ -1031,6 +1031,130 @@ await p.keyboard.press('Escape');
 await p.waitForTimeout(400);
 check((await p.locator('[role="dialog"]').count()) === 0, 'шит закрывается по Esc');
 
+// ── T-anthropic: путь к Claude через слой OpenAI-совместимости.
+// Полностью на моке: живой ключ смоуку недоступен, а проверить надо ровно то,
+// что ломается молча — заголовки браузерного доступа и подмену настройки
+// глубины (reasoning_effort у Anthropic игнорируется, нужен thinking).
+// Реальное поведение api.anthropic.com проверено вживую отдельным зондом:
+// без anthropic-dangerous-direct-browser-access браузер получает Failed to
+// fetch, с ним — читаемый ответ. Мок повторяет этот контракт.
+const anthropicCalls = [];
+let rejectManualThinking = false;
+await p.route(/api\.anthropic\.com/, async (route) => {
+  const req = route.request();
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, anthropic-version, anthropic-dangerous-direct-browser-access',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+  if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+  const body = req.postData() ? JSON.parse(req.postData()) : null;
+  anthropicCalls.push({ url: req.url(), headers: req.headers(), body });
+  if (req.url().endsWith('/models')) {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: cors,
+      body: JSON.stringify({ data: [{ id: 'claude-sonnet-5' }, { id: 'claude-haiku-4-5' }] }),
+    });
+  }
+  // Эмуляция реального отказа: новые модели отвергают ручной бюджет.
+  if (rejectManualThinking && body?.thinking) {
+    return route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      headers: cors,
+      body: JSON.stringify({ error: { message: '"thinking.type.enabled" is not supported' } }),
+    });
+  }
+  const sse =
+    'data: {"choices":[{"delta":{"content":"Ответ Клода"}}]}\n\n' +
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":3}}\n\n' +
+    'data: [DONE]\n\n';
+  return route.fulfill({ status: 200, contentType: 'text/event-stream', headers: cors, body: sse });
+});
+
+async function addAnthropic(model) {
+  await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Добавить провайдера' }).click();
+  await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Anthropic · Claude', exact: true }).click();
+  await p.waitForTimeout(200);
+  await p.getByPlaceholder('sk-...').fill('sk-ant-smoke');
+  await p.getByPlaceholder('gpt-5.6').first().fill(model);
+  await p.waitForTimeout(200);
+  await p.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await p.waitForTimeout(800);
+}
+
+async function askClaude() {
+  await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(600);
+  await p.getByRole('button', { name: 'Новый чат' }).first().click();
+  await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Системный промпт' }).first().click();
+  await p.waitForTimeout(400);
+  await p.getByRole('dialog').getByRole('button', { name: 'Высокая', exact: true }).click();
+  await p.waitForTimeout(150);
+  await p.getByRole('dialog').getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await p.waitForTimeout(700);
+  await p.getByPlaceholder('Спросите что угодно…').fill('Проверка Клода');
+  await p.getByRole('button', { name: 'Отправить' }).click();
+  await p.waitForTimeout(2500);
+}
+
+// Новое поколение: адаптивное мышление вместо игнорируемого reasoning_effort.
+await addAnthropic('claude-sonnet-5');
+await askClaude();
+const newGen = anthropicCalls.filter((c) => c.url.endsWith('/chat/completions')).at(-1);
+check(newGen?.headers['anthropic-version'] === '2023-06-01', 'anthropic: версия API в заголовках');
+check(
+  newGen?.headers['anthropic-dangerous-direct-browser-access'] === 'true',
+  'anthropic: заголовок браузерного доступа отправлен',
+);
+check(newGen?.body?.thinking?.type === 'adaptive', 'anthropic: у Claude 5 адаптивное мышление');
+check(newGen?.body?.output_config?.effort === 'high', 'anthropic: глубина уехала в output_config');
+check(newGen?.body?.reasoning_effort === undefined, 'anthropic: игнорируемый reasoning_effort не отправляется');
+check((await p.textContent('body')).includes('Ответ Клода'), 'anthropic: ответ дошёл до ленты');
+
+// Старое поколение: ручной бюджет мышления.
+await addAnthropic('claude-sonnet-4-5');
+await askClaude();
+const oldGen = anthropicCalls.filter((c) => c.url.endsWith('/chat/completions')).at(-1);
+check(oldGen?.body?.thinking?.type === 'enabled', 'anthropic: у Claude 4.5 ручной бюджет мышления');
+check(oldGen?.body?.thinking?.budget_tokens >= 1024, 'anthropic: бюджет не меньше минимума API');
+
+// Провайдер отверг настройку — ответ всё равно должен прийти.
+rejectManualThinking = true;
+await askClaude();
+const afterReject = anthropicCalls.filter((c) => c.url.endsWith('/chat/completions')).slice(-2);
+check(afterReject.length === 2 && !afterReject[1].body.thinking, 'anthropic: повтор без настройки после отказа');
+check((await p.textContent('body')).includes('Ответ Клода'), 'anthropic: ответ получен несмотря на отказ');
+rejectManualThinking = false;
+
+// Список моделей приезжает от провайдера.
+await p.goto(`${BASE}/settings`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(500);
+await p.getByRole('button', { name: 'Добавить провайдера' }).click();
+await p.waitForTimeout(400);
+await p.getByRole('button', { name: 'Anthropic · Claude', exact: true }).click();
+await p.getByPlaceholder('sk-...').fill('sk-ant-smoke');
+await p.waitForTimeout(200);
+await p.getByRole('button', { name: 'Подтянуть список' }).click();
+await p.waitForTimeout(900);
+check(
+  (await p.getByPlaceholder('gpt-5.6').first().inputValue()).startsWith('claude-'),
+  'anthropic: «Подтянуть список» заполнил модели',
+);
+await p.keyboard.press('Escape');
+await p.waitForTimeout(300);
+// Сцена оставляет за собой двух провайдеров Anthropic — возвращаем демо.
+await activateDemo();
+await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await p.waitForTimeout(600);
+
 await p.screenshot({ path: 'dist/smoke-chat.png' });
 await b.close();
 

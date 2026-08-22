@@ -45,6 +45,8 @@ export interface RunAgentParams {
   onStep?: (step: ToolStep) => void;
   /** Модель ответила 400 на запрос с tools — цикл продолжает без инструментов. */
   onToolsUnsupported?: () => void;
+  /** Провайдер отверг настройку глубины — запрос повторён без неё. */
+  onEffortDropped?: () => void;
 }
 
 export interface AgentResult extends Reply {
@@ -180,6 +182,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
     onReasoning,
     onStep,
     onToolsUnsupported,
+    onEffortDropped,
   } = p;
 
   // Демо-ветка живёт ВНУТРИ runAgent (не в streamChat): триггер по последнему
@@ -189,7 +192,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
     if (last && /найди|поиск|search/i.test(last.content)) {
       return runDemoAgent(last.content, model, onDelta, onStep, signal);
     }
-    const reply = await streamChat({ provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, reasoningEffort });
+    const reply = await streamChat({ provider, messages, systemPrompt, model, onDelta, onReasoning, signal, temperature, maxTokens, reasoningEffort, onEffortDropped });
     return { ...reply, toolTrace: [] };
   }
 
@@ -227,6 +230,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
         signal,
         temperature,
         reasoningEffort,
+        onEffortDropped,
         maxTokens,
         onDelta: wrapped,
         onReasoning,
@@ -245,6 +249,7 @@ export async function runAgent(p: RunAgentParams): Promise<AgentResult> {
           signal,
           temperature,
           reasoningEffort,
+          onEffortDropped,
           maxTokens,
           onDelta: wrapped,
           onReasoning,

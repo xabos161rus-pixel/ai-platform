@@ -61,3 +61,75 @@ export function providerHeaders(baseUrl: string, apiKey: string): Record<string,
   }
   return headers;
 }
+
+/** Провайдер — Anthropic (в т.ч. собственный прокси на их домене). */
+export function isAnthropic(baseUrl: string): boolean {
+  return /(^|\/\/)api\.anthropic\.com/.test(baseUrl);
+}
+
+/**
+ * Версия модели Claude из её идентификатора.
+ *
+ * Схемы именования у Anthropic две: старая `claude-3-7-sonnet-20250219` и
+ * новая `claude-sonnet-4-6`. Берём первые два числа, отбрасывая хвост-дату
+ * (её видно по величине). Эвристика намеренно грубая: единственное, на что
+ * она влияет, — какой из двух режимов мышления попробовать первым, а ошибку
+ * прикрывает фолбэк в client.ts.
+ */
+function claudeVersion(model: string): number {
+  const nums = (model.match(/\d+/g) ?? []).map(Number).filter((n) => n < 100);
+  if (!nums.length) return 99; // неизвестное имя — считаем новым
+  return nums[0] + (nums[1] ?? 0) / 10;
+}
+
+interface TuningInput {
+  model: string;
+  reasoningEffort?: 'low' | 'medium' | 'high';
+  temperature?: number;
+  maxTokens?: number;
+}
+
+/**
+ * Поля тела запроса, зависящие от вендора.
+ *
+ * У Anthropic `reasoning_effort` из OpenAI-формата **молча игнорируется** —
+ * регулятор глубины выглядел бы рабочим и не делал ничего. Настоящий рычаг
+ * у них другой, и он зависит от поколения модели:
+ *   · 4.6 и новее — адаптивное мышление плюс `output_config.effort`;
+ *   · 4.5 и старее — ручной бюджет `thinking.budget_tokens`, где минимум
+ *     1024 токена и бюджет обязан быть меньше `max_tokens`.
+ * Отправка не того варианта даёт 400, поэтому в client.ts есть фолбэк:
+ * запрос повторяется без этих полей.
+ */
+export function providerTuning(baseUrl: string, input: TuningInput): Record<string, unknown> {
+  const { model, reasoningEffort, temperature, maxTokens } = input;
+  if (!isAnthropic(baseUrl)) {
+    return reasoningEffort ? { reasoning_effort: reasoningEffort } : {};
+  }
+  if (!reasoningEffort) return {};
+
+  if (claudeVersion(model) >= 4.6) {
+    return { thinking: { type: 'adaptive' }, output_config: { effort: reasoningEffort } };
+  }
+
+  // Ручной бюджет: минимум 1024 и строго меньше max_tokens — иначе 400.
+  const wanted = { low: 4000, medium: 10000, high: 24000 }[reasoningEffort];
+  const budget = typeof maxTokens === 'number' ? Math.min(wanted, maxTokens - 1024) : wanted;
+  if (budget < 1024) return {};
+  // При ручном мышлении Anthropic принимает только temperature = 1, поэтому
+  // чужое значение здесь не отправляется вовсе (см. dropsTemperature).
+  void temperature;
+  return { thinking: { type: 'enabled', budget_tokens: budget } };
+}
+
+/** Отправляется ли для этого запроса ручной бюджет мышления (он несовместим с temperature). */
+export function dropsTemperature(baseUrl: string, tuning: Record<string, unknown>): boolean {
+  return (
+    isAnthropic(baseUrl) &&
+    typeof tuning.thinking === 'object' &&
+    (tuning.thinking as { type?: string }).type === 'enabled'
+  );
+}
+
+/** Поля, которые снимаются при повторе после 400: именно они могли не подойти модели. */
+export const TUNING_KEYS = ['thinking', 'output_config', 'reasoning_effort'] as const;

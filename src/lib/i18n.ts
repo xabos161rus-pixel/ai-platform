@@ -120,6 +120,8 @@ const ru = {
   'params.effortHigh': 'Высокая',
   'params.effortHint': 'Дольше думает — точнее и дороже: мысли оплачиваются как выходные токены',
   'params.effortHintPlain': 'Похоже, эта модель не думающая — параметр она, скорее всего, проигнорирует или ответит ошибкой',
+  'params.effortHintClaude':
+    'Claude думает всегда, глубина управляет тем, насколько долго. Сам текст рассуждения слой совместимости не отдаёт — поэтому блок «рассуждение» у ответа будет пустым',
   // Редактор моделей провайдера (T5)
   'provider.modelsHead': 'Модель · цена входа · цена выхода, ₽ за 1M токенов; цены необязательны',
   'preset.group.ru': 'Российские агрегаторы — рубли, без VPN',
@@ -359,6 +361,7 @@ const ru = {
   'tool.read_page': 'чтение',
   'tool.get_time': 'время',
   'trace.label': 'инструменты · {n}',
+  'agent.effortDropped': 'Модель не приняла настройку глубины — ответ получен без неё',
   'agent.toolsUnsupported': 'Модель без инструментов — отвечаю без поиска',
   'agent.stepAborted': 'остановлено',
   'agent.stepInterrupted': 'раунд прерван ошибкой',
@@ -466,6 +469,8 @@ const en: Record<TKey, string> = {
   'params.effortHigh': 'High',
   'params.effortHint': 'Thinks longer — more accurate and more expensive: reasoning is billed as output tokens',
   'params.effortHintPlain': 'This model does not look like a reasoning one — it will likely ignore the parameter or return an error',
+  'params.effortHintClaude':
+    'Claude always thinks; the depth controls how long. The compatibility layer does not return the reasoning text itself, so the “reasoning” block will stay empty',
   'provider.modelsHead': 'Model · input price · output price, ₽ per 1M tokens; prices are optional',
   'preset.group.ru': 'Russian aggregators — roubles, no VPN',
   'preset.group.direct': 'Direct APIs that answer from Russia',
@@ -699,6 +704,7 @@ const en: Record<TKey, string> = {
   'tool.read_page': 'read',
   'tool.get_time': 'time',
   'trace.label': 'tools · {n}',
+  'agent.effortDropped': 'The model rejected the reasoning-depth setting — answered without it',
   'agent.toolsUnsupported': 'Model has no tool support — answering without search',
   'agent.stepAborted': 'stopped',
   'agent.stepInterrupted': 'round interrupted by an error',

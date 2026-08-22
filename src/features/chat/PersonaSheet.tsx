@@ -8,7 +8,7 @@ import type { Chat, Persona } from '../../db/types';
 import { createPersona, listPersonas, removePersona } from '../../lib/ai/personaRepo';
 import { patchChat } from '../../lib/ai/chatRepo';
 import { useT } from '../../lib/i18n';
-import { isReasoningModel } from '../../lib/ai/models';
+import { isClaudeModel, isReasoningModel } from '../../lib/ai/models';
 
 interface Props {
   open: boolean;
@@ -203,7 +203,11 @@ export function PersonaSheet({ open, chat, onClose }: Props) {
               ))}
             </div>
             <span className="mt-1 block text-[length:var(--cc-text-caption)] leading-relaxed text-muted">
-              {isReasoningModel(chat.model) ? t('params.effortHint') : t('params.effortHintPlain')}
+              {isClaudeModel(chat.model)
+                ? t('params.effortHintClaude')
+                : isReasoningModel(chat.model)
+                  ? t('params.effortHint')
+                  : t('params.effortHintPlain')}
             </span>
           </div>
         </div>

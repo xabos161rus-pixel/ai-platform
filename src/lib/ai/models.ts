@@ -118,6 +118,15 @@ export function isReasoningModel(id: string): boolean {
   return /reason|thinking|deepseek-r\d|(^|[-/])o[134](-|$)|qwq|magistral/i.test(id);
 }
 
+/**
+ * Модель семейства Claude — по идентификатору, независимо от провайдера:
+ * агрегаторы проксируют тот же слой совместимости, что и Anthropic напрямую,
+ * и текст рассуждения там теряется одинаково.
+ */
+export function isClaudeModel(id: string): boolean {
+  return /claude|sonnet|opus|haiku/i.test(id);
+}
+
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);
 }
