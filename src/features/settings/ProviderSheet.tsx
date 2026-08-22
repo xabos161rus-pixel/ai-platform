@@ -4,6 +4,7 @@ import { Sheet } from '../../components/ui/Sheet';
 import { Button } from '../../components/ui/Button';
 import type { BaseEntity, Provider } from '../../db/types';
 import { modelEntries } from '../../lib/ai/models';
+import { PRESETS, providerHeaders, type PresetGroup } from '../../lib/ai/presets';
 import { useT } from '../../lib/i18n';
 import { useToast } from '../../components/ui/toastContext';
 
@@ -13,18 +14,6 @@ interface Props {
   onClose: () => void;
   onSave: (p: Omit<Provider, keyof BaseEntity>, id?: string) => void | Promise<void>;
 }
-
-/** Готовые адреса известных агрегаторов — чтобы не искать их в документации.
- *  models заполняются только там, где список короткий и стабильный: у
- *  агрегаторов он на сотни позиций и приезжает кнопкой «Подтянуть список».
- *  Цены не проставляем нигде — тарифы меняются, врать в счётчике нельзя. */
-const PRESETS: { name: string; baseUrl: string; models?: string[] }[] = [
-  { name: 'Polza.ai', baseUrl: 'https://api.polza.ai/api/v1' },
-  { name: 'VseGPT', baseUrl: 'https://api.vsegpt.ru/v1' },
-  { name: 'BotHub', baseUrl: 'https://bothub.chat/api/v2/openai/v1' },
-  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat', 'deepseek-reasoner'] },
-  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
-];
 
 /** Строка редактора моделей — поля ввода как строки, приводятся к числу только при сохранении. */
 interface ModelRow {
@@ -73,14 +62,12 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
   /** Подтянуть список моделей с эндпоинта провайдера (GET /models,
    *  OpenAI-формат). Новые id добавляются строками, цены уже введённых —
    *  не трогаются: прайс агрегаторы через API не отдают. */
-  async function handleFetchModels() {
-    const base = baseUrl.trim().replace(/\/+$/, '');
+  async function handleFetchModels(baseOverride?: string) {
+    const base = (baseOverride ?? baseUrl).trim().replace(/\/+$/, '');
     if (!base || fetching) return;
     setFetching(true);
     try {
-      const res = await fetch(`${base}/models`, {
-        headers: apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {},
-      });
+      const res = await fetch(`${base}/models`, { headers: providerHeaders(base, apiKey) });
       if (!res.ok) {
         toast(res.status === 401 || res.status === 403 ? t('provider.fetchAuthError') : t('provider.fetchError', { status: String(res.status) }));
         return;
@@ -132,28 +119,36 @@ export function ProviderSheet({ open, provider, onClose, onSave }: Props) {
     <Sheet open={open} onClose={onClose} title={provider ? t('provider.titleEdit') : t('provider.titleNew')}>
       <div className="space-y-3">
         {!provider && (
-          <div className="flex flex-wrap gap-1.5">
-            {PRESETS.map((p) => (
-              <button
-                key={p.name}
-                className="cc-hit rounded-full bg-surface-2 px-3 py-1.5 text-sm"
-                onClick={() => {
-                  setName(p.name);
-                  setBaseUrl(p.baseUrl);
-                  // Модели пресета подставляем только в пустую форму, чтобы
-                  // не затереть уже введённые вручную строки с ценами.
-                  if (p.models) {
-                    setRows((rs) =>
-                      rs.some((r) => r.id.trim())
-                        ? rs
-                        : p.models!.map((id) => ({ id, priceIn: '', priceOut: '' })),
-                    );
-                  }
-                }}
-              >
-                {p.name}
-              </button>
+          <div className="space-y-2.5">
+            {(['ru', 'direct', 'vpn'] as PresetGroup[]).map((group) => (
+              <div key={group}>
+                <p className="mb-1.5 text-[length:var(--cc-text-caption)] text-muted">
+                  {t(`preset.group.${group}`)}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRESETS.filter((p) => p.group === group).map((p) => (
+                    <button
+                      key={p.name}
+                      className="cc-hit rounded-full bg-surface-2 px-3 py-1.5 text-sm"
+                      onClick={() => {
+                        setName(p.name);
+                        setBaseUrl(p.baseUrl);
+                        // Модели в пресетах не зашиты: линейка провайдера
+                        // меняется быстрее, чем обновляется этот файл. Если
+                        // ключ уже введён — сразу спрашиваем список у самого
+                        // провайдера, это всегда актуальнее хардкода.
+                        if (apiKey.trim()) void handleFetchModels(p.baseUrl);
+                      }}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
+            <p className="text-[length:var(--cc-text-caption)] leading-relaxed text-muted">
+              {t('preset.hint')}
+            </p>
           </div>
         )}
         <Field label={t('provider.name')} value={name} onChange={setName} placeholder="Polza.ai" />

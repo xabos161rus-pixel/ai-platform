@@ -122,6 +122,11 @@ const ru = {
   'params.effortHintPlain': 'Похоже, эта модель не думающая — параметр она, скорее всего, проигнорирует или ответит ошибкой',
   // Редактор моделей провайдера (T5)
   'provider.modelsHead': 'Модель · цена входа · цена выхода, ₽ за 1M токенов; цены необязательны',
+  'preset.group.ru': 'Российские агрегаторы — рубли, без VPN',
+  'preset.group.direct': 'Напрямую, отвечают из России',
+  'preset.group.vpn': 'Западные — из России 403, нужен VPN или прокси',
+  'preset.hint':
+    'Пресет заполняет только адрес: линейка моделей у провайдеров меняется быстрее, чем обновляется приложение. Вбейте ключ и нажмите «Подтянуть список» — приедет то, что доступно вам прямо сейчас.',
   'provider.fetchModels': 'Подтянуть список',
   'provider.fetching': 'Запрашиваю…',
   'provider.fetchDone': 'Моделей у провайдера: {n}. Новые добавлены строками',
@@ -462,6 +467,11 @@ const en: Record<TKey, string> = {
   'params.effortHint': 'Thinks longer — more accurate and more expensive: reasoning is billed as output tokens',
   'params.effortHintPlain': 'This model does not look like a reasoning one — it will likely ignore the parameter or return an error',
   'provider.modelsHead': 'Model · input price · output price, ₽ per 1M tokens; prices are optional',
+  'preset.group.ru': 'Russian aggregators — roubles, no VPN',
+  'preset.group.direct': 'Direct APIs that answer from Russia',
+  'preset.group.vpn': 'Western vendors — 403 from Russia, VPN or proxy needed',
+  'preset.hint':
+    'A preset fills in the address only: model line-ups change faster than this app is updated. Enter your key and press “Fetch list” — you will get what is actually available to you right now.',
   'provider.fetchModels': 'Fetch list',
   'provider.fetching': 'Fetching…',
   'provider.fetchDone': 'Provider has {n} models. New ones added as rows',

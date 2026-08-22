@@ -86,6 +86,18 @@ check(
   (await p.getByPlaceholder('https://api.polza.ai/api/v1').inputValue()).includes('polza.ai'),
   'пресет подставил адрес API',
 );
+// Пресеты сгруппированы по доступности из России — три группы, и в каждой
+// свои вендоры. Проверяем и группировку, и то, что выбор из «западной»
+// группы тоже заполняет адрес.
+const presetBody = await p.textContent('body');
+check(presetBody.includes('Напрямую, отвечают из России'), 'пресеты разбиты на группы по доступности');
+check(presetBody.includes('Anthropic · Claude') && presetBody.includes('Kimi · Moonshot'), 'в пресетах есть Claude и Kimi');
+await p.getByRole('button', { name: 'Kimi · Moonshot' }).click();
+await p.waitForTimeout(300);
+check(
+  (await p.getByPlaceholder('https://api.polza.ai/api/v1').inputValue()).includes('moonshot'),
+  'пресет из другой группы подставил свой адрес',
+);
 
 // Второй чат и переключение между ними
 await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });

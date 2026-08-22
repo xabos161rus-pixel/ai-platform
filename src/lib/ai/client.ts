@@ -2,13 +2,15 @@
 //
 // Все поддерживаемые API — OpenAI-совместимые (/chat/completions), поэтому
 // один адаптер закрывает и российские агрегаторы, и собственный прокси, и
-// локальный сервер: различаются только baseUrl и ключ. Anthropic со своим
-// форматом Messages добавится отдельным адаптером, когда понадобится.
+// локальный сервер: различаются только baseUrl и ключ. Anthropic и Google
+// подключаются через свои слои OpenAI-совместимости (адреса — в presets.ts),
+// собственный формат Messages отдельным адаптером пока не нужен.
 //
 // Ключ живёт в IndexedDB устройства и уходит только самому провайдеру —
 // платформа BYOK, посредников между пользователем и его ключом нет.
 
 import type { Provider } from '../../db/types';
+import { providerHeaders } from './presets';
 import { estimateTokens } from './models';
 import { getLang, t } from '../i18n';
 
@@ -441,7 +443,10 @@ export async function streamChat(params: {
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...providerHeaders(provider.baseUrl, provider.apiKey),
+      },
       body: JSON.stringify({
         model,
         messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...wireMessages] : wireMessages,
@@ -508,7 +513,10 @@ export async function requestChat(params: {
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...providerHeaders(provider.baseUrl, provider.apiKey),
+      },
       body: JSON.stringify({
         model,
         messages: systemPrompt ? [{ role: 'system', content: systemPrompt }, ...wireMessages] : wireMessages,
